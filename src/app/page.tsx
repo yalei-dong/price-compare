@@ -1,65 +1,165 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useEffect } from "react";
+import SearchFilters from "@/components/SearchFilters";
+import ProductCard from "@/components/ProductCard";
+import { useShoppingList } from "@/context/ShoppingListContext";
+import { useLocale } from "@/context/LocaleContext";
+import { useTranslation } from "@/hooks/useTranslation";
+import { Product } from "@/lib/types";
+
+export default function HomePage() {
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [storeType, setStoreType] = useState("all");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [dataSource, setDataSource] = useState<"live" | "mock" | "mixed">("mock");
+  const { addItem } = useShoppingList();
+  const locale = useLocale();
+  const t = useTranslation();
+
+  useEffect(() => {
+    if (!locale.loading) fetchProducts();
+  }, [locale.loading]);
+
+  useEffect(() => {
+    if (!locale.loading) fetchProducts();
+  }, [category, storeType]);
+
+  async function fetchProducts() {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (query) params.set("q", query);
+      if (category !== "all") params.set("category", category);
+      if (storeType !== "all") params.set("storeType", storeType);
+      if (locale.countryCode) params.set("locale", locale.countryCode);
+
+      const res = await fetch(`/api/search?${params.toString()}`);
+      const data = await res.json();
+      setProducts(data.products);
+      setCategories(data.categories);
+      setDataSource(data.source || "mock");
+      setSearched(true);
+    } catch (err) {
+      console.error("Failed to search:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+      {/* Hero - compact on mobile */}
+      <div className="text-center mb-4 sm:mb-8">
+        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">
+          {t("home.title")}
+        </h1>
+        <p className="text-gray-500 text-xs sm:text-lg max-w-2xl mx-auto">
+          {t("home.subtitle")}
+        </p>
+        {!locale.loading && locale.label && (
+          <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-blue-600 font-medium">
+            📍 {t("home.showingPrices", { label: locale.label, symbol: locale.symbol, currency: locale.currency })}
           </p>
+        )}
+      </div>
+
+      {/* Search area */}
+      <SearchFilters
+        query={query}
+        onQueryChange={setQuery}
+        category={category}
+        onCategoryChange={setCategory}
+        storeType={storeType}
+        onStoreTypeChange={setStoreType}
+        categories={categories}
+        onSearch={fetchProducts}
+      />
+
+      {/* Category pills */}
+      {categories.length > 0 && (
+        <div className="flex flex-nowrap sm:flex-wrap justify-start sm:justify-center gap-2 mb-5 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-hide">
+          {["all", ...categories].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategory(cat)}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+                category === cat
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              {cat === "all" ? t("home.all") : cat}
+            </button>
+          ))}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      )}
+
+      {/* Quick search suggestions when idle */}
+      {!searched && !loading && (
+        <div className="mt-2 sm:mt-6">
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-3 text-center">Popular searches</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {["Milk", "Eggs", "Bread", "Chicken", "Rice", "Apples"].map((term) => (
+              <button
+                key={term}
+                onClick={() => {
+                  setQuery(term);
+                  setTimeout(() => fetchProducts(), 100);
+                }}
+                className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-colors shadow-sm"
+              >
+                {term}
+              </button>
+            ))}
+          </div>
         </div>
-      </main>
+      )}
+
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+          <p className="mt-3 text-gray-500">{t("home.searching")}</p>
+        </div>
+      ) : products.length > 0 ? (
+        <>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm sm:text-base text-gray-600">
+              <span className="font-semibold text-gray-900">{products.length}</span> {t("home.productsFound", { count: products.length })}
+            </p>
+            <span
+              className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-medium ${
+                dataSource === "live"
+                  ? "bg-green-100 text-green-700"
+                  : dataSource === "mixed"
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              {dataSource === "live"
+                ? t("home.livePrices")
+                : dataSource === "mixed"
+                ? t("home.liveMixed")
+                : t("home.sampleData")}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} onAddToList={addItem} />
+            ))}
+          </div>
+        </>
+      ) : searched ? (
+        <div className="text-center py-12">
+          <span className="text-5xl mb-4 block">🔍</span>
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">{t("home.noResults")}</h3>
+          <p className="text-gray-500">{t("home.searchHint")}</p>
+        </div>
+      ) : null}
     </div>
   );
 }

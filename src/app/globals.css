@@ -24,3 +24,22 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Scrollbar hide for horizontal scroll areas */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Mobile bottom nav spacing */
+@media (max-width: 767px) {
+  main {
+    padding-bottom: 4.5rem;
+  }
+  footer {
+    padding-bottom: 4.5rem;
+  }
+}
