@@ -49,61 +49,94 @@ export function getAllLocales(): { value: string; label: string }[] {
 }
 
 /**
+ * Geo-IP result including city/region for metro-area store matching.
+ */
+export interface GeoIPResult {
+  country: string;       // 2-letter country code
+  region?: string;       // State/province code (e.g. "NY", "CA", "ON")
+  city?: string;         // City name (e.g. "New York", "Los Angeles")
+}
+
 /**
- * Detect country from IP using free geo-IP APIs.
+ * Detect country, region, and city from IP using free geo-IP APIs.
  * Tries multiple providers for reliability.
  */
-export async function detectCountryFromIP(
+export async function detectGeoFromIP(
   clientIP?: string | null
-): Promise<string> {
-  // 1. Try ipapi.co (free, 1000/day, no key)
+): Promise<GeoIPResult> {
+  // 1. Try ipapi.co (free, 1000/day, no key) — returns JSON with city/region
   try {
     const url = clientIP
-      ? `https://ipapi.co/${encodeURIComponent(clientIP)}/country/`
-      : "https://ipapi.co/country/";
+      ? `https://ipapi.co/${encodeURIComponent(clientIP)}/json/`
+      : "https://ipapi.co/json/";
     const res = await fetch(url, {
-      headers: {
-        "User-Agent": "curl/8.0",
-        "Accept": "text/plain",
-      },
+      headers: { "User-Agent": "curl/8.0", "Accept": "application/json" },
       signal: AbortSignal.timeout(4000),
     });
     if (res.ok) {
-      const code = (await res.text()).trim().toUpperCase();
-      if (code.length === 2 && /^[A-Z]{2}$/.test(code)) return code;
+      const data = await res.json();
+      const country = (data.country_code || "").toUpperCase();
+      if (country.length === 2 && /^[A-Z]{2}$/.test(country)) {
+        return {
+          country,
+          region: data.region_code || undefined,
+          city: data.city || undefined,
+        };
+      }
     }
   } catch { /* fall through */ }
 
-  // 2. Fallback: ipinfo.io (free 50k/month, HTTPS)
+  // 2. Fallback: ip-api.com (free, 45/min, HTTP only) — returns city/regionName
   try {
     const url = clientIP
-      ? `https://ipinfo.io/${encodeURIComponent(clientIP)}/country`
-      : "https://ipinfo.io/country";
-    const res = await fetch(url, {
-      headers: {
-        "Accept": "text/plain",
-      },
-      signal: AbortSignal.timeout(4000),
-    });
-    if (res.ok) {
-      const code = (await res.text()).trim().toUpperCase();
-      if (code.length === 2 && /^[A-Z]{2}$/.test(code)) return code;
-    }
-  } catch { /* fall through */ }
-
-  // 3. Fallback: ip-api.com (free, 45/min, HTTP only)
-  try {
-    const url = clientIP
-      ? `http://ip-api.com/json/${encodeURIComponent(clientIP)}?fields=countryCode`
-      : "http://ip-api.com/json/?fields=countryCode";
+      ? `http://ip-api.com/json/${encodeURIComponent(clientIP)}?fields=countryCode,regionName,city`
+      : "http://ip-api.com/json/?fields=countryCode,regionName,city";
     const res = await fetch(url, {
       signal: AbortSignal.timeout(4000),
     });
     if (res.ok) {
       const data = await res.json();
-      if (data.countryCode) return data.countryCode.toUpperCase();
+      if (data.countryCode) {
+        return {
+          country: data.countryCode.toUpperCase(),
+          region: data.regionName || undefined,
+          city: data.city || undefined,
+        };
+      }
     }
   } catch { /* fall through */ }
 
-  return "US"; // Ultimate fallback
+  // 3. Fallback: ipinfo.io (country only)
+  try {
+    const url = clientIP
+      ? `https://ipinfo.io/${encodeURIComponent(clientIP)}/json`
+      : "https://ipinfo.io/json";
+    const res = await fetch(url, {
+      headers: { "Accept": "application/json" },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const country = (data.country || "").toUpperCase();
+      if (country.length === 2 && /^[A-Z]{2}$/.test(country)) {
+        return {
+          country,
+          region: data.region || undefined,
+          city: data.city || undefined,
+        };
+      }
+    }
+  } catch { /* fall through */ }
+
+  return { country: "US" }; // Ultimate fallback
+}
+
+/**
+ * Backward-compatible wrapper — returns just country code.
+ */
+export async function detectCountryFromIP(
+  clientIP?: string | null
+): Promise<string> {
+  const geo = await detectGeoFromIP(clientIP);
+  return geo.country;
 }

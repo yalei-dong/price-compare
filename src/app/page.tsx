@@ -16,7 +16,6 @@ export default function HomePage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [dataSource, setDataSource] = useState<"live" | "mock" | "mixed">("mock");
   const { addItem } = useShoppingList();
   const locale = useLocale();
   const t = useTranslation();
@@ -37,12 +36,12 @@ export default function HomePage() {
       if (category !== "all") params.set("category", category);
       if (storeType !== "all") params.set("storeType", storeType);
       if (locale.countryCode) params.set("locale", locale.countryCode);
+      if (locale.city) params.set("city", locale.city);
 
       const res = await fetch(`/api/search?${params.toString()}`);
       const data = await res.json();
       setProducts(data.products);
       setCategories(data.categories);
-      setDataSource(data.source || "mock");
       setSearched(true);
     } catch (err) {
       console.error("Failed to search:", err);
@@ -127,25 +126,10 @@ export default function HomePage() {
         </div>
       ) : products.length > 0 ? (
         <>
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <p className="text-sm sm:text-base text-gray-600">
               <span className="font-semibold text-gray-900">{products.length}</span> {t("home.productsFound", { count: products.length })}
             </p>
-            <span
-              className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-medium ${
-                dataSource === "live"
-                  ? "bg-green-100 text-green-700"
-                  : dataSource === "mixed"
-                  ? "bg-yellow-100 text-yellow-700"
-                  : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {dataSource === "live"
-                ? t("home.livePrices")
-                : dataSource === "mixed"
-                ? t("home.liveMixed")
-                : t("home.sampleData")}
-            </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {products.map((product) => (

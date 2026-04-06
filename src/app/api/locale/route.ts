@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLocaleConfig } from "@/lib/locale";
-import { detectLocaleFromRequest } from "@/lib/request-locale";
+import { detectLocaleFromRequest, detectGeoFromRequest } from "@/lib/request-locale";
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const tzHint = url.searchParams.get("tzHint");
 
-  let countryCode = await detectLocaleFromRequest(request);
+  let geo: { country: string; region?: string; city?: string } = { country: "US" };
+  try {
+    geo = await detectGeoFromRequest(request);
+  } catch {
+    // Geo detection failed (e.g. localhost) — use defaults
+  }
+  let countryCode = geo.country || "US";
 
   // If geo-IP returned the default "US" and the browser sent a timezone hint,
   // prefer the timezone hint — it's more reliable on localhost/VPN/corporate networks.
@@ -25,5 +31,6 @@ export async function GET(request: NextRequest) {
     symbol: locale.symbol,
     label: locale.label,
     lang: locale.lang,
+    city: geo.city || "",
   });
 }

@@ -23,6 +23,8 @@ export interface PriceEntry {
   thumbnail?: string;
   lastUpdated: string;
   inStock: boolean;
+  isFlyer?: boolean;     // true = price from a weekly flyer (time-limited)
+  validUntil?: string;   // ISO date when the flyer deal expires
 }
 
 export interface Product {

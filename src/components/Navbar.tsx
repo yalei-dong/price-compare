@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLocale } from "@/context/LocaleContext";
@@ -11,9 +11,111 @@ export default function Navbar() {
   const locale = useLocale();
   const t = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [postalInput, setPostalInput] = useState("");
+  const [postalError, setPostalError] = useState("");
+  const locationRef = useRef<HTMLDivElement>(null);
+
+  // Close location popover on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (locationRef.current && !locationRef.current.contains(e.target as Node)) {
+        setLocationOpen(false);
+      }
+    }
+    if (locationOpen) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [locationOpen]);
+
+  function handlePostalSubmit() {
+    const code = postalInput.trim();
+    if (!code) return;
+    setPostalError("");
+    locale.setPostalCode(code);
+    setLocationOpen(false);
+    setPostalInput("");
+  }
+
+  function handlePostalClear() {
+    locale.clearPostalCode();
+    setPostalInput("");
+    setPostalError("");
+    setLocationOpen(false);
+  }
+
+  const locationDisplay = locale.city
+    ? `${locale.city}, ${locale.countryCode}`
+    : locale.label;
+
+  const locationBadge = (
+    <div className="relative" ref={locationRef}>
+      <button
+        onClick={() => setLocationOpen(!locationOpen)}
+        className="px-3 py-1 bg-white/15 rounded-full text-xs font-medium hover:bg-white/25 transition-colors cursor-pointer"
+      >
+        📍 {locationDisplay} ({locale.symbol})
+        <span className="ml-1 opacity-70">▾</span>
+      </button>
+
+      {locationOpen && (
+        <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-4 z-[60] text-gray-800">
+          <p className="text-sm font-semibold mb-1">Set your location</p>
+          <p className="text-xs text-gray-500 mb-3">
+            Enter postal/zip code for more accurate local prices
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={postalInput}
+              onChange={(e) => setPostalInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handlePostalSubmit()}
+              placeholder="e.g. M5V 1J2 or 90210"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+            />
+            <button
+              onClick={handlePostalSubmit}
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            >
+              Set
+            </button>
+          </div>
+          {postalError && (
+            <p className="text-xs text-red-500 mt-1">{postalError}</p>
+          )}
+          {locale.postalCode && (
+            <button
+              onClick={handlePostalClear}
+              className="mt-2 text-xs text-blue-600 hover:underline"
+            >
+              Reset to auto-detect
+            </button>
+          )}
+          {locale.postalCode && (
+            <p className="mt-1 text-xs text-gray-400">
+              Currently set: {locale.postalCode}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const mobileLocationBadge = (
+    <div className="relative" ref={locationOpen ? undefined : locationRef}>
+      <button
+        onClick={() => setLocationOpen(!locationOpen)}
+        className="px-2 py-1 bg-white/15 rounded-full text-xs font-medium hover:bg-white/25 transition-colors"
+      >
+        📍 {locale.city ? `${locale.city}` : locale.symbol}
+        <span className="ml-0.5 opacity-70">▾</span>
+      </button>
+    </div>
+  );
 
   const NAV_ITEMS = [
     { href: "/", label: t("nav.search"), icon: "🔍" },
+    { href: "/ai-deals", label: "AI Deals", icon: "🤖" },
     { href: "/budget", label: t("nav.budget"), icon: "🥗" },
     { href: "/flyers", label: t("nav.flyers"), icon: "📰" },
     { href: "/receipts", label: t("nav.receipts"), icon: "🧾" },
@@ -26,7 +128,7 @@ export default function Navbar() {
   // Bottom tab bar items (most used)
   const BOTTOM_TABS = [
     { href: "/", label: t("nav.search"), icon: "🔍" },
-    { href: "/budget", label: t("nav.budget"), icon: "🥗" },
+    { href: "/ai-deals", label: "AI Deals", icon: "🤖" },
     { href: "/flyers", label: t("nav.flyers"), icon: "📰" },
     { href: "/watch-list", label: t("nav.watchList"), icon: "👁️" },
     { href: "/shopping-list", label: t("nav.shoppingList"), icon: "🛒" },
@@ -63,20 +165,12 @@ export default function Navbar() {
                 {item.label}
               </Link>
             ))}
-            {!locale.loading && locale.label && (
-              <span className="ml-3 px-3 py-1 bg-white/15 rounded-full text-xs font-medium">
-                📍 {locale.label} ({locale.symbol})
-              </span>
-            )}
+            {!locale.loading && locale.label && locationBadge}
           </nav>
 
           {/* Mobile: locale + overflow menu */}
           <div className="flex items-center gap-2 md:hidden">
-            {!locale.loading && locale.label && (
-              <span className="px-2 py-1 bg-white/15 rounded-full text-xs font-medium">
-                📍 {locale.symbol}
-              </span>
-            )}
+            {!locale.loading && locale.label && mobileLocationBadge}
             {OVERFLOW_ITEMS.length > 0 && (
               <button
                 onClick={() => setMenuOpen(!menuOpen)}

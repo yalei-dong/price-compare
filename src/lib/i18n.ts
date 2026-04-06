@@ -11,7 +11,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "nav.scan": "Scan",
 
     // Home
-    "home.title": "Compare Grocery Prices Worldwide",
+    "home.title": "Compare Grocery Prices",
     "home.subtitle": "Compare prices across Amazon, Walmart, Costco, and your local stores. Search any product to find the best deal.",
     "home.showingPrices": "Showing prices for {label} ({symbol} {currency})",
     "home.all": "All",

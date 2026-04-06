@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 
 interface LocaleInfo {
   countryCode: string;
@@ -9,6 +9,10 @@ interface LocaleInfo {
   label: string;
   lang: string;
   loading: boolean;
+  city: string;
+  postalCode: string;
+  setPostalCode: (code: string) => void;
+  clearPostalCode: () => void;
 }
 
 const LocaleContext = createContext<LocaleInfo>({
@@ -18,6 +22,10 @@ const LocaleContext = createContext<LocaleInfo>({
   label: "",
   lang: "en",
   loading: true,
+  city: "",
+  postalCode: "",
+  setPostalCode: () => {},
+  clearPostalCode: () => {},
 });
 
 export function useLocale() {
@@ -25,13 +33,15 @@ export function useLocale() {
 }
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<LocaleInfo>({
+  const [locale, setLocale] = useState<Omit<LocaleInfo, "setPostalCode" | "clearPostalCode">>({
     countryCode: "",
     currency: "USD",
     symbol: "$",
     label: "",
     lang: "en",
     loading: true,
+    city: "",
+    postalCode: "",
   });
 
   // Keep <html lang> in sync with detected language
@@ -41,8 +51,19 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     }
   }, [locale.loading, locale.lang]);
 
+  // Initial load — check localStorage for saved postal code
   useEffect(() => {
-    // Detect country hint from browser timezone as fallback
+    const saved = localStorage.getItem("pc_postal");
+    if (saved) {
+      // Lookup from saved postal code
+      lookupPostal(saved);
+    } else {
+      // Normal IP-based detection
+      detectFromIP();
+    }
+  }, []);
+
+  function detectFromIP() {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
     const browserHint = detectCountryFromTimezone(tz);
     const params = new URLSearchParams();
@@ -51,29 +72,32 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     fetch(`/api/locale?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => {
-        setLocale({
+        setLocale((prev) => ({
+          ...prev,
           countryCode: data.countryCode || browserHint || "US",
           currency: data.currency || "USD",
           symbol: data.symbol || "$",
           label: data.label || "United States",
           lang: data.lang || "en",
+          city: data.city || "",
           loading: false,
-        });
+        }));
       })
       .catch(() => {
-        // If API fails entirely, use browser hint
         if (browserHint) {
           fetch(`/api/locale?locale=${browserHint}`)
             .then((res) => res.json())
             .then((data) => {
-              setLocale({
+              setLocale((prev) => ({
+                ...prev,
                 countryCode: data.countryCode || browserHint,
                 currency: data.currency || "USD",
                 symbol: data.symbol || "$",
                 label: data.label || "",
                 lang: data.lang || "en",
+                city: "",
                 loading: false,
-              });
+              }));
             })
             .catch(() => {
               setLocale((prev) => ({ ...prev, loading: false }));
@@ -82,10 +106,51 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
           setLocale((prev) => ({ ...prev, loading: false }));
         }
       });
+  }
+
+  async function lookupPostal(code: string) {
+    try {
+      const res = await fetch(`/api/postal-lookup?code=${encodeURIComponent(code)}`);
+      const data = await res.json();
+      if (data.error) {
+        // Bad postal code — fall back to IP
+        localStorage.removeItem("pc_postal");
+        detectFromIP();
+        return;
+      }
+      setLocale((prev) => ({
+        ...prev,
+        countryCode: data.countryCode || prev.countryCode,
+        currency: data.currency || prev.currency,
+        symbol: data.symbol || prev.symbol,
+        label: data.label || prev.label,
+        lang: data.lang || prev.lang,
+        city: data.city || "",
+        postalCode: code,
+        loading: false,
+      }));
+    } catch {
+      localStorage.removeItem("pc_postal");
+      detectFromIP();
+    }
+  }
+
+  const handleSetPostalCode = useCallback((code: string) => {
+    localStorage.setItem("pc_postal", code);
+    setLocale((prev) => ({ ...prev, loading: true, postalCode: code }));
+    lookupPostal(code);
+  }, []);
+
+  const handleClearPostalCode = useCallback(() => {
+    localStorage.removeItem("pc_postal");
+    setLocale((prev) => ({ ...prev, loading: true, postalCode: "", city: "" }));
+    detectFromIP();
   }, []);
 
   return (
-    <LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>
+    <LocaleContext.Provider value={{ ...locale, setPostalCode: handleSetPostalCode, clearPostalCode: handleClearPostalCode }}>
+      {children}
+    </LocaleContext.Provider>
   );
 }
 

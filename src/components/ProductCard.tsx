@@ -77,7 +77,14 @@ export default function ProductCard({ product, onAddToList }: ProductCardProps) 
                 e.stopPropagation();
               }}
             >
-              <div className="text-xs text-green-700 font-medium mb-1">{t("card.bestPrice")}</div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs text-green-700 font-medium">{t("card.bestPrice")}</span>
+                {(lowestPrice.isFlyer || lowestPrice.type === "local") && (
+                  <span className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded font-medium">
+                    📋 Flyer Deal{lowestPrice.validUntil ? ` · Ends ${new Date(lowestPrice.validUntil).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}` : ""}
+                  </span>
+                )}
+              </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-green-700">
                   {CURRENCY_SYMBOLS[lowestPrice.currency]}{lowestPrice.price.toFixed(2)}

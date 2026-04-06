@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { detectCountryFromIP } from "./locale";
+import { detectCountryFromIP, detectGeoFromIP, GeoIPResult } from "./locale";
 
 /** Returns true for loopback / private IPs that geo-IP APIs cannot resolve. */
 function isPrivateIP(ip: string): boolean {
@@ -32,11 +32,22 @@ export function getClientIP(request: NextRequest): string | null {
 
 /** Detect locale country code from request. */
 export async function detectLocaleFromRequest(request: NextRequest): Promise<string> {
-  // Allow explicit override via query param (used by frontend that already detected)
   const url = new URL(request.url);
   const explicit = url.searchParams.get("locale");
   if (explicit && /^[A-Z]{2}$/i.test(explicit)) return explicit.toUpperCase();
 
   const clientIP = getClientIP(request);
   return detectCountryFromIP(clientIP);
+}
+
+/** Detect full geo info (country + city + region) from request. */
+export async function detectGeoFromRequest(request: NextRequest): Promise<GeoIPResult> {
+  const url = new URL(request.url);
+  const explicit = url.searchParams.get("locale");
+  if (explicit && /^[A-Z]{2}$/i.test(explicit)) {
+    return { country: explicit.toUpperCase() };
+  }
+
+  const clientIP = getClientIP(request);
+  return detectGeoFromIP(clientIP);
 }

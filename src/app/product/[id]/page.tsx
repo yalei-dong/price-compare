@@ -125,40 +125,66 @@ export default function ProductDetailPage() {
       {/* Price Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {cheapest && (
-          <a
-            href={cheapest.url || `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(product.name + " " + cheapest.storeName)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block bg-green-50 border border-green-200 rounded-xl p-4 transition-colors hover:bg-green-100 hover:border-green-400 cursor-pointer group"
-          >
-            <div className="text-xs text-green-700 font-medium mb-1">{t("detail.cheapest")}</div>
-            <div className="text-2xl font-bold text-green-700">
-              {CURRENCY_SYMBOLS[cheapest.currency]}{cheapest.price.toFixed(2)}
-              <span className="text-sm font-normal text-green-600 ml-1">{cheapest.currency}</span>
+          cheapest.url ? (
+            <a
+              href={cheapest.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block bg-green-50 border border-green-200 rounded-xl p-4 transition-colors hover:bg-green-100 hover:border-green-400 cursor-pointer group"
+            >
+              <div className="text-xs text-green-700 font-medium mb-1">{t("detail.cheapest")}</div>
+              <div className="text-2xl font-bold text-green-700">
+                {CURRENCY_SYMBOLS[cheapest.currency]}{cheapest.price.toFixed(2)}
+                <span className="text-sm font-normal text-green-600 ml-1">{cheapest.currency}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-green-600 mt-1">
+                <span>{cheapest.storeLogo} {cheapest.storeName}</span>
+                <span className="text-xs font-medium group-hover:underline">{t("card.visitStore")} ↗</span>
+              </div>
+            </a>
+          ) : (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <div className="text-xs text-green-700 font-medium mb-1">{t("detail.cheapest")}</div>
+              <div className="text-2xl font-bold text-green-700">
+                {CURRENCY_SYMBOLS[cheapest.currency]}{cheapest.price.toFixed(2)}
+                <span className="text-sm font-normal text-green-600 ml-1">{cheapest.currency}</span>
+              </div>
+              <div className="text-sm text-green-600 mt-1">
+                {cheapest.storeLogo} {cheapest.storeName}
+              </div>
             </div>
-            <div className="flex items-center justify-between text-sm text-green-600 mt-1">
-              <span>{cheapest.storeLogo} {cheapest.storeName}</span>
-              <span className="text-xs font-medium group-hover:underline">{t("card.visitStore")} ↗</span>
-            </div>
-          </a>
+          )
         )}
         {mostExpensive && (
-          <a
-            href={mostExpensive.url || `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(product.name + " " + mostExpensive.storeName)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block bg-red-50 border border-red-200 rounded-xl p-4 transition-colors hover:bg-red-100 hover:border-red-400 cursor-pointer group"
-          >
-            <div className="text-xs text-red-700 font-medium mb-1">{t("detail.mostExpensive")}</div>
-            <div className="text-2xl font-bold text-red-600">
-              {CURRENCY_SYMBOLS[mostExpensive.currency]}{mostExpensive.price.toFixed(2)}
-              <span className="text-sm font-normal text-red-500 ml-1">{mostExpensive.currency}</span>
+          mostExpensive.url ? (
+            <a
+              href={mostExpensive.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block bg-red-50 border border-red-200 rounded-xl p-4 transition-colors hover:bg-red-100 hover:border-red-400 cursor-pointer group"
+            >
+              <div className="text-xs text-red-700 font-medium mb-1">{t("detail.mostExpensive")}</div>
+              <div className="text-2xl font-bold text-red-600">
+                {CURRENCY_SYMBOLS[mostExpensive.currency]}{mostExpensive.price.toFixed(2)}
+                <span className="text-sm font-normal text-red-500 ml-1">{mostExpensive.currency}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-red-500 mt-1">
+                <span>{mostExpensive.storeLogo} {mostExpensive.storeName}</span>
+                <span className="text-xs font-medium group-hover:underline">{t("card.visitStore")} ↗</span>
+              </div>
+            </a>
+          ) : (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="text-xs text-red-700 font-medium mb-1">{t("detail.mostExpensive")}</div>
+              <div className="text-2xl font-bold text-red-600">
+                {CURRENCY_SYMBOLS[mostExpensive.currency]}{mostExpensive.price.toFixed(2)}
+                <span className="text-sm font-normal text-red-500 ml-1">{mostExpensive.currency}</span>
+              </div>
+              <div className="text-sm text-red-500 mt-1">
+                {mostExpensive.storeLogo} {mostExpensive.storeName}
+              </div>
             </div>
-            <div className="flex items-center justify-between text-sm text-red-500 mt-1">
-              <span>{mostExpensive.storeLogo} {mostExpensive.storeName}</span>
-              <span className="text-xs font-medium group-hover:underline">{t("card.visitStore")} ↗</span>
-            </div>
-          </a>
+          )
         )}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <div className="text-xs text-blue-700 font-medium mb-1">{t("detail.priceRange")}</div>

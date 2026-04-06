@@ -5,9 +5,7 @@ import { useLocale } from "@/context/LocaleContext";
 import { useTranslation } from "@/hooks/useTranslation";
 import {
   getStoresForLocale,
-  FlyerCountry,
   StoreFlyer,
-  COUNTRY_NAMES,
   TYPE_LABELS,
 } from "@/lib/flyer-data";
 
@@ -20,29 +18,17 @@ export default function FlyersPage() {
     [locale.countryCode]
   );
 
-  const [activeCountry, setActiveCountry] = useState<FlyerCountry>(data.country);
   const [filterType, setFilterType] = useState<string>("all");
 
-  const allCountries: { code: FlyerCountry; stores: StoreFlyer[] }[] = useMemo(() => {
-    const list = [{ code: data.country, stores: data.stores }];
-    for (const o of data.otherCountries) {
-      list.push({ code: o.country, stores: o.stores });
-    }
-    return list;
-  }, [data]);
-
   const currentStores = useMemo(() => {
-    const entry = allCountries.find((c) => c.code === activeCountry);
-    const stores = entry?.stores || [];
-    if (filterType === "all") return stores;
-    return stores.filter((s) => s.type === filterType);
-  }, [allCountries, activeCountry, filterType]);
+    if (filterType === "all") return data.stores;
+    return data.stores.filter((s) => s.type === filterType);
+  }, [data.stores, filterType]);
 
   const storeTypes = useMemo(() => {
-    const entry = allCountries.find((c) => c.code === activeCountry);
-    const types = new Set((entry?.stores || []).map((s) => s.type));
+    const types = new Set(data.stores.map((s) => s.type));
     return ["all", ...Array.from(types)] as string[];
-  }, [allCountries, activeCountry]);
+  }, [data.stores]);
 
   const typeColor: Record<string, string> = {
     grocery: "bg-green-100 text-green-700",
@@ -59,26 +45,11 @@ export default function FlyersPage() {
           📰 {t("flyers.title")}
         </h1>
         <p className="text-gray-600">{t("flyers.subtitle")}</p>
-      </div>
-
-      {/* Country tabs */}
-      <div className="flex flex-wrap justify-center gap-2 mb-6">
-        {allCountries.map(({ code }) => (
-          <button
-            key={code}
-            onClick={() => { setActiveCountry(code); setFilterType("all"); }}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              activeCountry === code
-                ? "bg-indigo-600 text-white shadow-md"
-                : "bg-white border border-gray-200 text-gray-700 hover:border-indigo-300"
-            }`}
-          >
-            {t(COUNTRY_NAMES[code])}
-            <span className="ml-1 text-xs opacity-70">
-              ({allCountries.find((c) => c.code === code)?.stores.length})
-            </span>
-          </button>
-        ))}
+        {!locale.loading && locale.label && (
+          <p className="mt-2 text-sm text-blue-600 font-medium">
+            📍 {locale.label}
+          </p>
+        )}
       </div>
 
       {/* Type filter */}

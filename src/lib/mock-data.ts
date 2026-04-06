@@ -241,7 +241,7 @@ const STORE_SEARCH_URLS: Record<string, (q: string) => string> = {
   "costco-ca":     (q) => `https://www.costco.ca/CatalogSearch?dept=All&keyword=${encodeURIComponent(q)}`,
   "loblaws-ca":    (q) => `https://www.loblaws.ca/search?search-bar=${encodeURIComponent(q)}`,
   "nofrills-local": (q) => `https://www.nofrills.ca/search?search-bar=${encodeURIComponent(q)}`,
-  "freshco-local": (q) => `https://www.freshco.com/search/?search-term=${encodeURIComponent(q)}`,
+  "freshco-local": (q) => `https://www.freshco.com/flyer?view=list&search=${encodeURIComponent(q)}`,
   "jd-cn":         (q) => `https://search.jd.com/Search?keyword=${encodeURIComponent(q)}`,
   "taobao-cn":     (q) => `https://s.taobao.com/search?q=${encodeURIComponent(q)}`,
   "pinduoduo-cn":  (q) => `https://mobile.yangkeduo.com/search_result.html?search_key=${encodeURIComponent(q)}`,
