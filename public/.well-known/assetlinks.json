@@ -3,6 +3,6 @@
   "target": {
     "namespace": "android_app",
     "package_name": "com.pricecompare.app",
-    "sha256_cert_fingerprints": ["REPLACE_WITH_YOUR_SHA256_FINGERPRINT"]
+    "sha256_cert_fingerprints": ["E8:18:E2:08:BD:C4:E7:4A:9D:DC:64:36:11:A3:30:C9:CD:D6:66:80:CA:0C:69:E2:5E:C8:D3:E8:1E:16:2E:8A"]
   }
 }]
