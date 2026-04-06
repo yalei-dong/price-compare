@@ -45,15 +45,19 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="min-h-full flex flex-col bg-gray-50">
         <Providers>
           <Navbar />
           <main className="flex-1">{children}</main>
-          <footer className="bg-gray-800 text-gray-400 text-center py-4 text-sm">
-            PriceCompare &copy; 2026 &mdash; Compare grocery prices worldwide
+          <footer className="bg-gray-800 text-gray-400 text-center py-4 text-sm space-y-1">
+            <p>PriceCompare &copy; 2026 &mdash; Compare grocery prices worldwide</p>
+            <p className="space-x-3">
+              <a href="/privacy" className="hover:text-gray-200 underline">Privacy Policy</a>
+              <a href="/terms" className="hover:text-gray-200 underline">Terms of Service</a>
+            </p>
           </footer>
         </Providers>
       </body>
