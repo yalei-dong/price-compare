@@ -178,6 +178,7 @@ async function flippSearch(
     if (!productName) continue;
 
     const store = item.merchant_name || item.merchant || "Unknown Store";
+    // Use the user's search query for store URLs (not the verbose flyer name)
     results.push({
       storeName: store,
       price,
@@ -186,7 +187,7 @@ async function flippSearch(
       imageUrl: item.clean_image_url || item.clipping_image_url || item.cutout_image_url || item.image_url || undefined,
       unit: parseUnit(item),
       validUntil: item.valid_to || undefined,
-      productUrl: buildStoreSearchUrl(store, productName),
+      productUrl: buildStoreSearchUrl(store, query),
     });
   }
 
