@@ -110,61 +110,116 @@ function buildStoreSearchUrl(storeName: string, productName: string): string | u
   return undefined;
 }
 
+// Common adjectives/qualifiers that can be stripped to broaden a search
+const BROADENING_ADJECTIVES = [
+  "organic", "free range", "free run", "cage free", "cage-free",
+  "grass fed", "grass-fed", "natural", "gluten free", "gluten-free",
+  "sugar free", "sugar-free", "low fat", "low-fat", "non-gmo",
+  "whole grain", "whole wheat", "extra virgin", "unsalted", "salted",
+  "fresh", "frozen", "smoked", "roasted", "raw", "dried",
+  "large", "small", "mini", "jumbo",
+];
+
+/**
+ * Try to produce a shorter / broader version of the query to find more results.
+ * e.g. "organic eggs" → "eggs", "grass fed ground beef" → "ground beef"
+ */
+function broadenQuery(query: string): string | null {
+  const lower = query.toLowerCase().trim();
+  for (const adj of BROADENING_ADJECTIVES) {
+    if (lower.includes(adj)) {
+      const broader = lower.replace(new RegExp(`\\b${adj}\\b`, "gi"), "").replace(/\s+/g, " ").trim();
+      if (broader.length >= 2 && broader !== lower) return broader;
+    }
+  }
+  // If multi-word but no known adjective, try dropping the first word
+  const words = lower.split(/\s+/);
+  if (words.length >= 3) {
+    return words.slice(1).join(" ");
+  }
+  return null;
+}
+
+async function flippSearch(
+  query: string,
+  countryCode: string,
+  postalCode: string
+): Promise<ScrapedPrice[]> {
+  const locale = countryCode === "CA" ? "en-ca" : "en-us";
+  const params = new URLSearchParams({
+    locale,
+    postal_code: postalCode,
+    q: query,
+  });
+
+  const res = await fetch(
+    `https://backflipp.wishabi.com/flipp/items/search?${params}`,
+    {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Accept: "application/json",
+      },
+    }
+  );
+
+  if (!res.ok) return [];
+
+  const data: FlippResponse = await res.json();
+  if (!data.items || data.items.length === 0) return [];
+
+  const currency = countryCode === "CA" ? "CAD" : "USD";
+  const results: ScrapedPrice[] = [];
+
+  for (const item of data.items) {
+    const price = parseFlippPrice(item);
+    if (!price || price <= 0 || price > 9999) continue;
+
+    const productName = item.name || item.description;
+    if (!productName) continue;
+
+    const store = item.merchant_name || item.merchant || "Unknown Store";
+    results.push({
+      storeName: store,
+      price,
+      currency,
+      productName,
+      imageUrl: item.clean_image_url || item.clipping_image_url || item.cutout_image_url || item.image_url || undefined,
+      unit: parseUnit(item),
+      validUntil: item.valid_to || undefined,
+      productUrl: buildStoreSearchUrl(store, productName),
+    });
+  }
+
+  return results;
+}
+
+const MIN_UNIQUE_STORES = 3;
+
 export const flippScraper: Scraper = {
   name: "flipp",
   countries: ["CA", "US"],
 
   async scrape(query, countryCode, postalCode) {
     const postal = postalCode || DEFAULT_POSTAL[countryCode] || DEFAULT_POSTAL.US;
-    const locale = countryCode === "CA" ? "en-ca" : "en-us";
-
-    const params = new URLSearchParams({
-      locale,
-      postal_code: postal,
-      q: query,
-    });
 
     try {
-      const res = await fetch(
-        `https://backflipp.wishabi.com/flipp/items/search?${params}`,
-        {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            Accept: "application/json",
-          },
+      let results = await flippSearch(query, countryCode, postal);
+
+      // If results are thin, broaden the query and merge
+      const uniqueStores = new Set(results.map((r) => r.storeName.toLowerCase()));
+      if (uniqueStores.size < MIN_UNIQUE_STORES) {
+        const broader = broadenQuery(query);
+        if (broader) {
+          const extraResults = await flippSearch(broader, countryCode, postal);
+          // Merge: add stores we don't already have (keep original exact-match results)
+          const existingStores = new Set(results.map((r) => r.storeName.toLowerCase()));
+          for (const r of extraResults) {
+            if (!existingStores.has(r.storeName.toLowerCase())) {
+              existingStores.add(r.storeName.toLowerCase());
+              results.push(r);
+            }
+          }
         }
-      );
-
-      if (!res.ok) {
-        console.error(`Flipp scraper error: ${res.status}`);
-        return [];
-      }
-
-      const data: FlippResponse = await res.json();
-      if (!data.items || data.items.length === 0) return [];
-
-      const currency = countryCode === "CA" ? "CAD" : "USD";
-      const results: ScrapedPrice[] = [];
-
-      for (const item of data.items) {
-        const price = parseFlippPrice(item);
-        if (!price || price <= 0 || price > 9999) continue;
-
-        // Skip items without a product name
-        const productName = item.name || item.description;
-        if (!productName) continue;
-
-        const store = item.merchant_name || item.merchant || "Unknown Store";
-        results.push({
-          storeName: store,
-          price,
-          currency,
-          productName,
-          imageUrl: item.clean_image_url || item.clipping_image_url || item.cutout_image_url || item.image_url || undefined,
-          unit: parseUnit(item),
-          validUntil: item.valid_to || undefined,
-          productUrl: buildStoreSearchUrl(store, productName),
-        });
       }
 
       return results;
