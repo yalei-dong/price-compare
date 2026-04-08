@@ -306,7 +306,7 @@ const STORE_DIRECT_URLS: Record<string, (q: string) => string> = {
   "no frills":      (q) => `https://www.nofrills.ca/search?search-bar=${encodeURIComponent(q)}`,
   "nofrills":       (q) => `https://www.nofrills.ca/search?search-bar=${encodeURIComponent(q)}`,
   "metro":          (q) => `https://www.metro.ca/en/search?filter=${encodeURIComponent(q)}`,
-  "sobeys":         (q) => `https://www.sobeys.com/search/?search_term=${encodeURIComponent(q)}`,
+  "sobeys":         (q) => `https://voila.ca/search?q=${encodeURIComponent(q)}`,
   "freshco":        (q) => `https://www.freshco.com/search/?search-term=${encodeURIComponent(q)}`,
   "superc":         (q) => `https://www.superc.ca/en/search?filter=${encodeURIComponent(q)}`,
   "food basics":    (q) => `https://www.foodbasics.ca/search?filter=${encodeURIComponent(q)}`,

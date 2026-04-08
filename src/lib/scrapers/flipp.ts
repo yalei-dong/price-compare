@@ -77,7 +77,6 @@ const STORE_SEARCH_URLS: Record<string, string> = {
   "provigo":                  "https://www.provigo.ca/search?search-bar=",
   "maxi":                     "https://www.maxi.ca/search?search-bar=",
   "fortinos":                 "https://www.fortinos.ca/search?search-bar=",
-  "shoppers drug mart":       "https://www.shoppersdrugmart.ca/search?search-bar=",
   // Other CA stores with working search
   "walmart":                  "https://www.walmart.ca/search?q=",
   "metro":                    "https://www.metro.ca/en/search?filter=",
@@ -100,14 +99,15 @@ const STORE_SEARCH_URLS: Record<string, string> = {
   // public search URL — omitted to avoid 404 errors.
 };
 
-function buildStoreSearchUrl(storeName: string, productName: string): string | undefined {
+function buildStoreSearchUrl(storeName: string, query: string): string {
   const lower = storeName.toLowerCase();
   for (const [key, base] of Object.entries(STORE_SEARCH_URLS)) {
     if (lower.includes(key)) {
-      return base + encodeURIComponent(productName);
+      return base + encodeURIComponent(query);
     }
   }
-  return undefined;
+  // Fallback: Google search for the product at this store
+  return `https://www.google.com/search?q=${encodeURIComponent(query + " " + storeName)}`;
 }
 
 // Common adjectives/qualifiers that can be stripped to broaden a search
