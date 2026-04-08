@@ -28,6 +28,7 @@ interface FlippItem {
   merchant_name?: string;
   merchant?: string;
   flyer_id?: number;
+  flyer_item_id?: number;
 }
 
 interface FlippResponse {
@@ -67,48 +68,52 @@ function parseUnit(item: FlippItem): string {
   return "each";
 }
 
-// Build a search URL on the store's own website so "Visit store" is useful
-const STORE_SEARCH_URLS: Record<string, string> = {
-  // Loblaw banner stores (all use search-bar param)
-  "no frills":                "https://www.nofrills.ca/search?search-bar=",
-  "loblaws":                  "https://www.loblaws.ca/search?search-bar=",
-  "real canadian superstore":  "https://www.realcanadiansuperstore.ca/search?search-bar=",
-  "superstore":               "https://www.realcanadiansuperstore.ca/search?search-bar=",
-  "provigo":                  "https://www.provigo.ca/search?search-bar=",
-  "maxi":                     "https://www.maxi.ca/search?search-bar=",
-  "fortinos":                 "https://www.fortinos.ca/search?search-bar=",
-  // Other CA stores with working search
-  "walmart":                  "https://www.walmart.ca/search?q=",
-  "metro":                    "https://www.metro.ca/en/search?filter=",
-  "food basics":              "https://www.foodbasics.ca/search?filter=",
-  "giant tiger":              "https://www.gianttiger.com/search?q=",
-  "t&t":                      "https://www.tntsupermarket.com/catalogsearch/result/?q=",
-  "costco":                   "https://www.costco.ca/CatalogSearch?keyword=",
-  // Stores without grocery search — link to flyer page
-  "shoppers drug mart":       "https://www.shoppersdrugmart.ca/flyer?locale=en&type=1&flyer_run_id=&auto_flyer=&search_term=",
-  "freshco":                  "https://www.freshco.com/flyer?view=list&search=",
-  "sobeys":                   "https://www.sobeys.com/flyer/?search=",
-  "safeway":                  "https://www.safeway.ca/flyer/?search=",
+// Link to each store's own flyer page (since prices come from flyers)
+const STORE_FLYER_URLS: Record<string, string> = {
+  // Loblaw banner stores
+  "no frills":                "https://www.nofrills.ca/flyer",
+  "loblaws":                  "https://www.loblaws.ca/flyer",
+  "real canadian superstore":  "https://www.realcanadiansuperstore.ca/flyer",
+  "superstore":               "https://www.realcanadiansuperstore.ca/flyer",
+  "provigo":                  "https://www.provigo.ca/flyer",
+  "maxi":                     "https://www.maxi.ca/flyer",
+  "fortinos":                 "https://www.fortinos.ca/flyer",
+  "valu-mart":                "https://www.valumart.ca/flyer",
+  "foodland":                 "https://www.foodland.ca/flyer",
+  "independent":              "https://www.yourindependentgrocer.ca/flyer",
+  "shoppers drug mart":       "https://www.shoppersdrugmart.ca/flyer",
+  // Sobeys banner stores
+  "sobeys":                   "https://www.sobeys.com/flyer/",
+  "freshco":                  "https://www.freshco.com/flyer/",
+  "safeway":                  "https://www.safeway.ca/flyer/",
   "farm boy":                 "https://www.farmboy.ca/flyer/",
+  "iga":                      "https://www.iga.net/en/flyer",
+  // Other CA stores
+  "walmart":                  "https://www.walmart.ca/flyer",
+  "metro":                    "https://www.metro.ca/en/flyer",
+  "food basics":              "https://www.foodbasics.ca/flyer",
+  "giant tiger":              "https://www.gianttiger.com/flyer",
+  "t&t":                      "https://www.tntsupermarket.com/flyer",
+  "costco":                   "https://www.costco.ca/warehouse-savings.html",
   "save-on-foods":            "https://www.saveonfoods.com/flyer/",
+  "london drugs":             "https://www.londondrugs.com/flyer/",
+  "rexall":                   "https://www.rexall.ca/flyer",
   // US stores
-  "target":                   "https://www.target.com/s?searchTerm=",
-  "kroger":                   "https://www.kroger.com/search?query=",
-  "aldi":                     "https://www.aldi.us/search/?text=",
-  "whole foods":              "https://www.wholefoodsmarket.com/search?text=",
-  // NOTE: FreshCo, Sobeys, Safeway, Save-On-Foods, Farm Boy have no working
-  // public search URL — omitted to avoid 404 errors.
+  "target":                   "https://www.target.com/weekly-ad",
+  "kroger":                   "https://www.kroger.com/weeklyad",
+  "aldi":                     "https://www.aldi.us/weekly-specials/",
+  "whole foods":              "https://www.wholefoodsmarket.com/sales-flyer",
 };
 
 function buildStoreSearchUrl(storeName: string, query: string): string {
   const lower = storeName.toLowerCase();
-  for (const [key, base] of Object.entries(STORE_SEARCH_URLS)) {
+  for (const [key, url] of Object.entries(STORE_FLYER_URLS)) {
     if (lower.includes(key)) {
-      return base + encodeURIComponent(query);
+      return url;
     }
   }
-  // Fallback: Google search for the product at this store
-  return `https://www.google.com/search?q=${encodeURIComponent(query + " " + storeName)}`;
+  // Fallback: Google search for the store's flyer
+  return `https://www.google.com/search?q=${encodeURIComponent(storeName + " flyer")}`;
 }
 
 // Common adjectives/qualifiers that can be stripped to broaden a search
@@ -179,7 +184,7 @@ async function flippSearch(
     if (!productName) continue;
 
     const store = item.merchant_name || item.merchant || "Unknown Store";
-    // Use the user's search query for store URLs (not the verbose flyer name)
+    // Always link to the store's own flyer page (not Flipp)
     results.push({
       storeName: store,
       price,
