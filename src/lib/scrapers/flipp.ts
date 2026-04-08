@@ -84,7 +84,8 @@ const STORE_SEARCH_URLS: Record<string, string> = {
   "giant tiger":              "https://www.gianttiger.com/search?q=",
   "t&t":                      "https://www.tntsupermarket.com/catalogsearch/result/?q=",
   "costco":                   "https://www.costco.ca/CatalogSearch?keyword=",
-  // Sobeys-platform stores (no product search URL, link to flyer instead)
+  // Stores without grocery search — link to flyer page
+  "shoppers drug mart":       "https://www.shoppersdrugmart.ca/flyer?locale=en&type=1&flyer_run_id=&auto_flyer=&search_term=",
   "freshco":                  "https://www.freshco.com/flyer?view=list&search=",
   "sobeys":                   "https://www.sobeys.com/flyer/?search=",
   "safeway":                  "https://www.safeway.ca/flyer/?search=",

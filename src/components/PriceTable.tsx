@@ -70,7 +70,7 @@ export default function PriceTable({ prices, sortBy = "price" }: PriceTableProps
                       <span className="font-medium text-gray-800 text-sm sm:text-base block truncate">{price.storeName}</span>
                       {price.url && (
                         <span className="block text-xs text-blue-500">
-                          {t("table.visitStore")}
+                          {price.isFlyer ? (t("table.viewFlyer") || "View flyer →") : t("table.visitStore")}
                         </span>
                       )}
                     </div>
