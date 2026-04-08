@@ -195,6 +195,22 @@ async function flippSearch(
 
 const MIN_UNIQUE_STORES = 3;
 
+/**
+ * Filter results to only include items relevant to the query.
+ * For multi-word queries, all query words must appear in the product name
+ * (prevents "organic milk" matching "coconut milk" or "organic chocolate").
+ */
+function filterRelevant(results: ScrapedPrice[], query: string): ScrapedPrice[] {
+  const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
+  if (queryWords.length <= 1) return results; // single-word queries: trust Flipp ranking
+
+  return results.filter((r) => {
+    const name = (r.productName || "").toLowerCase();
+    // Every query word must appear in the product name
+    return queryWords.every((word) => name.includes(word));
+  });
+}
+
 export const flippScraper: Scraper = {
   name: "flipp",
   countries: ["CA", "US"],
@@ -203,14 +219,17 @@ export const flippScraper: Scraper = {
     const postal = postalCode || DEFAULT_POSTAL[countryCode] || DEFAULT_POSTAL.US;
 
     try {
-      let results = await flippSearch(query, countryCode, postal);
+      const rawResults = await flippSearch(query, countryCode, postal);
+      // Filter to items that match all query words
+      let results = filterRelevant(rawResults, query);
 
       // If results are thin, broaden the query and merge
       const uniqueStores = new Set(results.map((r) => r.storeName.toLowerCase()));
       if (uniqueStores.size < MIN_UNIQUE_STORES) {
         const broader = broadenQuery(query);
         if (broader) {
-          const extraResults = await flippSearch(broader, countryCode, postal);
+          const extraRaw = await flippSearch(broader, countryCode, postal);
+          const extraResults = filterRelevant(extraRaw, broader);
           // Merge: add stores we don't already have (keep original exact-match results)
           const existingStores = new Set(results.map((r) => r.storeName.toLowerCase()));
           for (const r of extraResults) {
