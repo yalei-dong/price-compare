@@ -159,14 +159,27 @@ export const rabbaScraper: Scraper = {
         ? `${item.name}, ${item.size}`
         : item.name;
 
+      const validTo = parseValidTo(item.validDates);
+
+      // Build in-app flyer-item URL (same pattern as Flipp / Whole Foods)
+      const flyerParams = new URLSearchParams();
+      flyerParams.set("store", "Rabba");
+      flyerParams.set("product", fullName);
+      flyerParams.set("price", String(item.price));
+      flyerParams.set("currency", "CAD");
+      if (item.image) flyerParams.set("image", item.image);
+      if (validTo) flyerParams.set("to", validTo);
+      if (item.saleInfo) flyerParams.set("sale", item.saleInfo);
+      flyerParams.set("q", query);
+
       results.push({
         storeName: "Rabba",
         price: item.price,
         currency: "CAD",
         productName: fullName,
         imageUrl: item.image || undefined,
-        productUrl: "https://rabba.com/flyers/",
-        validUntil: parseValidTo(item.validDates),
+        productUrl: `/flyer-item?${flyerParams.toString()}`,
+        validUntil: validTo,
       });
     }
 
