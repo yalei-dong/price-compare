@@ -79,14 +79,25 @@ function toScrapedPrice(item: WFProduct, currency: string, countryCode: string):
     : item.name;
 
   // wholefoodsmarket.com product URLs are all broken (redirect to Amazon 404).
-  // Link to the sales flyer page which is the only reliable WF URL.
+  // Build an in-app flyer-item URL so users see the product details within our app.
+  const params = new URLSearchParams();
+  params.set("store", "Whole Foods");
+  params.set("product", fullName);
+  params.set("price", String(price));
+  if (item.imageThumbnail) params.set("image", item.imageThumbnail);
+  if (item.saleEndDate) params.set("to", item.saleEndDate);
+  if (item.salePrice && item.regularPrice && item.salePrice < item.regularPrice) {
+    params.set("sale", `Was $${item.regularPrice.toFixed(2)}, now $${item.salePrice.toFixed(2)}`);
+  }
+  params.set("logo", "https://www.wholefoodsmarket.com/apple-touch-icon.png");
+
   const result: ScrapedPrice = {
     storeName: "Whole Foods",
     price,
     currency,
     productName: fullName,
     imageUrl: item.imageThumbnail || undefined,
-    productUrl: "https://www.wholefoodsmarket.com/sales-flyer",
+    productUrl: `/flyer-item?${params.toString()}`,
   };
 
   if (item.saleEndDate) {
