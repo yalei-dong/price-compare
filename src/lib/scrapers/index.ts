@@ -10,9 +10,10 @@ import { flippScraper } from "./flipp";
 import { walmartScraper } from "./walmart";
 import { loblawScraper } from "./loblaw";
 import { costcoScraper } from "./costco";
+import { wholeFoodsScraper } from "./wholefoods";
 
 // Register all scrapers
-const ALL_SCRAPERS: Scraper[] = [flippScraper, walmartScraper, loblawScraper, costcoScraper];
+const ALL_SCRAPERS: Scraper[] = [flippScraper, walmartScraper, loblawScraper, costcoScraper, wholeFoodsScraper];
 
 // ---------------------------------------------------------------------------
 // In-memory cache for scraped results (24h TTL, same as SerpAPI cache)
@@ -125,6 +126,7 @@ function toPriceEntries(
       inStock: true,
       isFlyer: true,
       validUntil: item.validUntil || undefined,
+      productName: item.productName || undefined,
     };
   });
 }

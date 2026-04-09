@@ -25,6 +25,7 @@ export interface PriceEntry {
   inStock: boolean;
   isFlyer?: boolean;     // true = price from a weekly flyer (time-limited)
   validUntil?: string;   // ISO date when the flyer deal expires
+  productName?: string;  // original product name from scraper/search
 }
 
 export interface Product {
