@@ -197,13 +197,6 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* Price History Chart */}
-      <PriceHistoryChart
-        productId={product.id}
-        productName={product.name}
-        currentPrices={product.prices}
-      />
-
       {/* Filters & Sort */}
       <div className="bg-white rounded-xl shadow-md p-4 mb-6">
         <div className="flex flex-wrap items-center gap-4">
@@ -235,9 +228,16 @@ export default function ProductDetailPage() {
       </div>
 
       {/* Price Table */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+      <div className="bg-white rounded-xl shadow-md overflow-hidden mb-6">
         <PriceTable prices={filteredPrices} sortBy={sortBy} />
       </div>
+
+      {/* Price History Chart */}
+      <PriceHistoryChart
+        productId={product.id}
+        productName={product.name}
+        currentPrices={product.prices}
+      />
     </div>
   );
 }
