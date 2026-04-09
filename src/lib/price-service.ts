@@ -314,7 +314,7 @@ const STORE_DIRECT_URLS: Record<string, (q: string) => string> = {
   "voila":          (q) => `https://www.voila.ca/search?q=${encodeURIComponent(q)}`,
   "real canadian superstore": (q) => `https://www.realcanadiansuperstore.ca/search?search-bar=${encodeURIComponent(q)}`,
   "save-on-foods":  (q) => `https://www.saveonfoods.com/search?search-term=${encodeURIComponent(q)}`,
-  "t&t":            (q) => `https://www.tntsupermarket.com/catalogsearch/result/?q=${encodeURIComponent(q)}`,
+  "t&t":            () => `https://www.tntsupermarket.com/eng/store-flyer`,
   "foody mart":     (q) => `https://www.foodymart.com/?s=${encodeURIComponent(q)}`,
   "oceans":         (q) => `https://www.oceansfreshfood.com/search?q=${encodeURIComponent(q)}`,
   "nations fresh":  (q) => `https://www.nationsfreshfoods.ca/search?q=${encodeURIComponent(q)}`,

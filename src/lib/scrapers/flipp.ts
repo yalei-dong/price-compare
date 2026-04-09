@@ -93,7 +93,7 @@ const STORE_FLYER_URLS: Record<string, string> = {
   "metro":                    "https://www.metro.ca/en/flyer",
   "food basics":              "https://www.foodbasics.ca/flyer",
   "giant tiger":              "https://www.gianttiger.com/flyer",
-  "t&t":                      "https://www.tntsupermarket.com/flyer",
+  "t&t":                      "https://www.tntsupermarket.com/eng/store-flyer",
   "costco":                   "https://www.costco.ca/warehouse-savings.html",
   "save-on-foods":            "https://www.saveonfoods.com/flyer/",
   "london drugs":             "https://www.londondrugs.com/flyer/",
