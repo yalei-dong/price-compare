@@ -169,20 +169,10 @@ function FlyerItemContent() {
 
           {/* Actions */}
           <div className="space-y-3 mt-6">
-            {flippUrl && (
-              <a
-                href={flippUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full text-center px-4 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors"
-              >
-                📰 View Full Flyer on Flipp
-              </a>
-            )}
             {query && (
               <Link
                 href={`/product/live-${encodeURIComponent(query)}`}
-                className="block w-full text-center px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                className="block w-full text-center px-4 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors"
               >
                 🔍 Compare Prices at Other Stores
               </Link>
