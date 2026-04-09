@@ -170,7 +170,38 @@ const NON_FOOD_STORES = new Set([
   "henry's", "the camera store",
   "home furniture", "ashley", "bad boy", "surplus furniture",
   "tsc stores", "peavey industries",
+  "the shopping channel", "tsc", "the source", "best buy",
+  "apple", "samsung", "dell", "hp store", "lenovo",
+  "eb games", "gamestop", "game stop",
+  "pandora", "peoples jewellers", "swarovski",
+  "bell", "telus", "rogers", "fido", "koodo", "virgin",
 ]);
+
+// Non-food product keywords — items containing these are clearly not groceries.
+// Used to filter out electronics, appliances, clothing, etc. from grocery results.
+const NON_FOOD_KEYWORDS = [
+  "watch", "smartwatch", "iwatch", "fitbit", "garmin",
+  "iphone", "ipad", "macbook", "airpod", "laptop", "tablet", "chromebook",
+  "tv", "television", "monitor", "soundbar", "speaker", "headphone", "earbud",
+  "camera", "drone", "gopro", "printer", "scanner", "router", "modem",
+  "playstation", "xbox", "nintendo", "switch", "ps5", "ps4", "gaming",
+  "vacuum", "dyson", "roomba", "air purifier", "humidifier", "dehumidifier",
+  "mattress", "pillow", "duvet", "bedding", "comforter",
+  "jacket", "hoodie", "sneaker", "boot", "sandal", "parka", "coat",
+  "jewelry", "jewellery", "necklace", "bracelet", "earring", "ring",
+  "furniture", "sofa", "couch", "desk", "shelf", "bookcase",
+  "tire", "motor oil", "wiper", "car seat",
+  "power tool", "drill", "saw", "wrench", "socket set",
+  "lawnmower", "lawn mower", "snow blower", "leaf blower",
+  "bicycle", "bike", "treadmill", "elliptical", "dumbbell",
+  "kayak", "tent", "sleeping bag",
+  "titanium case", "trail loop", "ultra 2",
+];
+
+function isNonFoodProduct(productName: string): boolean {
+  const lower = productName.toLowerCase();
+  return NON_FOOD_KEYWORDS.some((kw) => lower.includes(kw));
+}
 
 async function flippSearch(
   query: string,
@@ -213,6 +244,9 @@ async function flippSearch(
 
     // Skip non-food stores
     if (NON_FOOD_STORES.has(store.toLowerCase().trim())) continue;
+
+    // Skip non-food products (electronics, appliances, clothing, etc.)
+    if (isNonFoodProduct(productName)) continue;
 
     const imageUrl = item.clean_image_url || item.clipping_image_url || item.cutout_image_url || item.image_url || undefined;
     const unit = parseUnit(item);
@@ -267,6 +301,10 @@ const FOOD_CATEGORY_WORDS = new Set([
 
 function filterRelevant(results: ScrapedPrice[], query: string): ScrapedPrice[] {
   const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
+
+  // Always filter out non-food products regardless of query length
+  results = results.filter((r) => !isNonFoodProduct(r.productName || ""));
+
   if (queryWords.length <= 1) return results; // single-word queries: trust Flipp ranking
 
   const querySet = new Set(queryWords);

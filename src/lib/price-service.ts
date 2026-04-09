@@ -554,6 +554,31 @@ const FOOD_CAT = new Set([
   "paste", "ketchup", "puree", "salsa", "stew", "bisque", "chutney",
 ]);
 
+/** Non-food product keywords — items containing these are clearly not groceries. */
+const NON_FOOD_KEYWORDS = [
+  "watch", "smartwatch", "iwatch", "fitbit", "garmin",
+  "iphone", "ipad", "macbook", "airpod", "laptop", "tablet", "chromebook",
+  "tv", "television", "monitor", "soundbar", "speaker", "headphone", "earbud",
+  "camera", "drone", "gopro", "printer", "scanner", "router", "modem",
+  "playstation", "xbox", "nintendo", "switch", "ps5", "ps4", "gaming",
+  "vacuum", "dyson", "roomba", "air purifier", "humidifier", "dehumidifier",
+  "mattress", "pillow", "duvet", "bedding", "comforter",
+  "jacket", "hoodie", "sneaker", "boot", "sandal", "parka", "coat",
+  "jewelry", "jewellery", "necklace", "bracelet", "earring", "ring",
+  "furniture", "sofa", "couch", "desk", "shelf", "bookcase",
+  "tire", "motor oil", "wiper", "car seat",
+  "power tool", "drill", "wrench", "socket set",
+  "lawnmower", "lawn mower", "snow blower", "leaf blower",
+  "bicycle", "bike", "treadmill", "elliptical", "dumbbell",
+  "kayak", "tent", "sleeping bag",
+  "titanium case", "trail loop",
+];
+
+function isNonFoodItem(name: string): boolean {
+  const lower = name.toLowerCase();
+  return NON_FOOD_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
 /**
  * Pick the best thumbnail for a query from a set of price entries.
  * Prefers items whose productName closely matches the query (avoids
@@ -589,6 +614,9 @@ function pickBestThumbnail(prices: PriceEntry[], query: string): string {
 }
 
 function filterMisleadingResults(results: PriceEntry[], query: string): PriceEntry[] {
+  // Always filter out non-food products (electronics, appliances, etc.)
+  results = results.filter((r) => !isNonFoodItem(r.productName || ""));
+
   const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
   if (queryWords.length === 0) return results;
 
