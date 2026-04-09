@@ -232,14 +232,42 @@ const MIN_UNIQUE_STORES = 3;
  * For multi-word queries, all query words must appear in the product name
  * (prevents "organic milk" matching "coconut milk" or "organic chocolate").
  */
+// Common food category words — used to detect misleading compound nouns.
+// e.g. "milk chocolate" is chocolate (not milk), "cream cheese" is cheese (not cream).
+const FOOD_CATEGORY_WORDS = new Set([
+  "chocolate", "cheese", "cake", "bread", "juice", "sauce", "butter",
+  "cream", "wine", "beer", "coffee", "tea", "jam", "candy", "cookie",
+  "cracker", "chip", "bar", "powder", "cereal", "soup", "steak",
+  "sausage", "burger", "pie", "pudding", "yogurt", "vinegar", "oil",
+  "milk", "water", "flour", "sugar", "salt", "pepper", "rice", "pasta",
+]);
+
 function filterRelevant(results: ScrapedPrice[], query: string): ScrapedPrice[] {
   const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
   if (queryWords.length <= 1) return results; // single-word queries: trust Flipp ranking
 
+  const querySet = new Set(queryWords);
+
   return results.filter((r) => {
     const name = (r.productName || "").toLowerCase();
     // Every query word must appear in the product name
-    return queryWords.every((word) => name.includes(word));
+    if (!queryWords.every((word) => name.includes(word))) return false;
+
+    // Detect misleading compounds: if the last query word (the head noun,
+    // e.g. "milk") is followed by another food-category word NOT in the query
+    // (e.g. "chocolate"), the product is something else (milk chocolate ≠ milk).
+    const headNoun = queryWords[queryWords.length - 1];
+    const nameWords = name.split(/[\s,/]+/);
+    for (let i = 0; i < nameWords.length - 1; i++) {
+      if (nameWords[i] === headNoun || nameWords[i].includes(headNoun)) {
+        const nextWord = nameWords[i + 1];
+        if (FOOD_CATEGORY_WORDS.has(nextWord) && !querySet.has(nextWord)) {
+          return false; // "milk chocolate", "cream cheese" etc.
+        }
+      }
+    }
+
+    return true;
   });
 }
 

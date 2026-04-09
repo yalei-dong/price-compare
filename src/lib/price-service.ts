@@ -854,7 +854,14 @@ export async function getProductByIdReal(id: string, localeCode: string = "US"):
     const query = decodeURIComponent(id.replace("live-", ""));
     const prices = await fetchGoogleShoppingPrices(query, localeCode);
     if (prices.length > 0) {
-      const thumb = prices.find((p) => p.thumbnail)?.thumbnail || "";
+      // Pick thumbnail from the median-priced item (avoids outlier images
+      // from mismatched cheap or expensive items)
+      const withThumb = prices.filter((p) => p.thumbnail);
+      let thumb = "";
+      if (withThumb.length > 0) {
+        const sorted = [...withThumb].sort((a, b) => a.price - b.price);
+        thumb = sorted[Math.floor(sorted.length / 2)].thumbnail || "";
+      }
       return {
         id,
         name: query,
