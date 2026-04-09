@@ -626,6 +626,9 @@ function filterMisleadingResults(results: PriceEntry[], query: string): PriceEnt
     const name = (r.productName || "").toLowerCase();
     if (!name) return true; // keep items with no name info
 
+    // Product name must contain every query word
+    if (!queryWords.every((w) => name.includes(w))) return false;
+
     const nameWords = name.split(/[\s,/]+/).filter(Boolean);
 
     // For every query word, check if the product name uses it as a modifier

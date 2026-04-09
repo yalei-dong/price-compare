@@ -305,7 +305,14 @@ function filterRelevant(results: ScrapedPrice[], query: string): ScrapedPrice[] 
   // Always filter out non-food products regardless of query length
   results = results.filter((r) => !isNonFoodProduct(r.productName || ""));
 
-  if (queryWords.length <= 1) return results; // single-word queries: trust Flipp ranking
+  // For ALL queries (including single-word), the product name must contain
+  // every query word. Flipp often returns unrelated items (e.g. crackers for "pear").
+  results = results.filter((r) => {
+    const name = (r.productName || "").toLowerCase();
+    return queryWords.every((word) => name.includes(word));
+  });
+
+  if (queryWords.length <= 1) return results;
 
   const querySet = new Set(queryWords);
 
