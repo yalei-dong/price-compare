@@ -551,6 +551,7 @@ const FOOD_CAT = new Set([
   "sausage", "burger", "pie", "pudding", "yogurt", "vinegar", "oil",
   "milk", "water", "flour", "sugar", "salt", "pepper", "rice", "pasta",
   "cup", "cups", "bunny", "egg", "eggs", "cone", "wafer", "spread",
+  "paste", "ketchup", "puree", "salsa", "stew", "bisque", "chutney",
 ]);
 
 /**
@@ -589,21 +590,27 @@ function pickBestThumbnail(prices: PriceEntry[], query: string): string {
 
 function filterMisleadingResults(results: PriceEntry[], query: string): PriceEntry[] {
   const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
-  if (queryWords.length <= 1) return results;
+  if (queryWords.length === 0) return results;
 
   const querySet = new Set(queryWords);
-  const headNoun = queryWords[queryWords.length - 1];
 
   return results.filter((r) => {
     const name = (r.productName || "").toLowerCase();
     if (!name) return true; // keep items with no name info
 
     const nameWords = name.split(/[\s,/]+/).filter(Boolean);
-    for (let i = 0; i < nameWords.length - 1; i++) {
-      if (nameWords[i] === headNoun || nameWords[i].includes(headNoun)) {
-        const nextWord = nameWords[i + 1];
-        if (FOOD_CAT.has(nextWord) && !querySet.has(nextWord)) {
-          return false; // "peanut butter chocolate", "milk chocolate", etc.
+
+    // For every query word, check if the product name uses it as a modifier
+    // for a different food category word not in the query.
+    // e.g. query "tomato" → reject "tomato sauce", "tomato soup"
+    // e.g. query "peanut butter" → reject "peanut butter chocolate" but keep "peanut butter"
+    for (const qw of queryWords) {
+      for (let i = 0; i < nameWords.length - 1; i++) {
+        if (nameWords[i] === qw || nameWords[i].includes(qw)) {
+          const nextWord = nameWords[i + 1];
+          if (FOOD_CAT.has(nextWord) && !querySet.has(nextWord)) {
+            return false;
+          }
         }
       }
     }
