@@ -39,8 +39,15 @@ export default function PriceTable({ prices, sortBy = "price" }: PriceTableProps
         <tbody>
           {sorted.map((price, idx) => {
             const isBest = price.inStock && lowestPrice !== null && price.price === lowestPrice;
+            const isInternal = price.url?.startsWith("/");
             const handleRowClick = () => {
-              if (price.url) window.open(price.url, "_blank", "noopener,noreferrer");
+              if (price.url) {
+                if (isInternal) {
+                  window.location.href = price.url;
+                } else {
+                  window.open(price.url, "_blank", "noopener,noreferrer");
+                }
+              }
             };
             return (
               <tr

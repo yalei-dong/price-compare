@@ -27,6 +27,7 @@ interface FlippItem {
   // Flipp uses merchant_name (not merchant)
   merchant_name?: string;
   merchant?: string;
+  merchant_logo?: string;
   flyer_id?: number;
   flyer_item_id?: number;
 }
@@ -190,16 +191,34 @@ async function flippSearch(
     if (!productName) continue;
 
     const store = item.merchant_name || item.merchant || "Unknown Store";
-    // Always link to the store's own flyer page (not Flipp)
+    const imageUrl = item.clean_image_url || item.clipping_image_url || item.cutout_image_url || item.image_url || undefined;
+    const unit = parseUnit(item);
+
+    // Build in-app flyer detail page URL
+    const flyerParams = new URLSearchParams();
+    flyerParams.set("store", store);
+    flyerParams.set("product", productName);
+    flyerParams.set("price", price.toString());
+    flyerParams.set("currency", currency);
+    if (imageUrl) flyerParams.set("image", imageUrl);
+    if (item.valid_from) flyerParams.set("from", item.valid_from);
+    if (item.valid_to) flyerParams.set("to", item.valid_to);
+    if (unit) flyerParams.set("unit", unit);
+    if (item.sale_story) flyerParams.set("sale", item.sale_story);
+    if (item.merchant_logo) flyerParams.set("logo", item.merchant_logo);
+    if (item.flyer_id) flyerParams.set("fid", item.flyer_id.toString());
+    if (item.flyer_item_id) flyerParams.set("iid", item.flyer_item_id.toString());
+    flyerParams.set("q", query);
+
     results.push({
       storeName: store,
       price,
       currency,
       productName,
-      imageUrl: item.clean_image_url || item.clipping_image_url || item.cutout_image_url || item.image_url || undefined,
-      unit: parseUnit(item),
+      imageUrl,
+      unit,
       validUntil: item.valid_to || undefined,
-      productUrl: buildStoreSearchUrl(store, query),
+      productUrl: `/flyer-item?${flyerParams.toString()}`,
     });
   }
 
