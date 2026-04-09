@@ -552,6 +552,11 @@ const FOOD_CAT = new Set([
   "milk", "water", "flour", "sugar", "salt", "pepper", "rice", "pasta",
   "cup", "cups", "bunny", "egg", "eggs", "cone", "wafer", "spread",
   "paste", "ketchup", "puree", "salsa", "stew", "bisque", "chutney",
+  "shrimp", "chicken", "fish", "salmon", "tuna", "cod", "tilapia",
+  "pork", "beef", "lamb", "turkey", "wings", "nuggets", "meatball",
+  "pizza", "noodle", "noodles", "fries", "dumpling", "dumplings",
+  "dip", "hummus", "mayo", "mustard", "dressing", "marinade",
+  "seasoning", "rub", "mix", "syrup", "honey", "jelly",
 ]);
 
 /** Non-food product keywords — items containing these are clearly not groceries. */

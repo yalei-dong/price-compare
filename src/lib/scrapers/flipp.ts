@@ -297,6 +297,11 @@ const FOOD_CATEGORY_WORDS = new Set([
   "cracker", "chip", "bar", "powder", "cereal", "soup", "steak",
   "sausage", "burger", "pie", "pudding", "yogurt", "vinegar", "oil",
   "milk", "water", "flour", "sugar", "salt", "pepper", "rice", "pasta",
+  "shrimp", "chicken", "fish", "salmon", "tuna", "cod", "tilapia",
+  "pork", "beef", "lamb", "turkey", "wings", "nuggets", "meatball",
+  "pizza", "noodle", "noodles", "fries", "dumpling", "dumplings",
+  "dip", "hummus", "mayo", "mustard", "dressing", "marinade",
+  "seasoning", "rub", "mix", "syrup", "honey", "jelly",
 ]);
 
 function filterRelevant(results: ScrapedPrice[], query: string): ScrapedPrice[] {
