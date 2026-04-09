@@ -88,6 +88,7 @@ const STORE_META: Record<string, { logo: string; type: "online" | "local" | "bot
   "trader joe":     { logo: "🌻", type: "local" },
   "whole foods":    { logo: "🥬", type: "both" },
   "save-on-foods":  { logo: "🏪", type: "both" },
+  "rabba":          { logo: "🟤", type: "local" },
 };
 
 function getStoreMeta(name: string): { logo: string; type: "online" | "local" | "both" } {

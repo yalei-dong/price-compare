@@ -105,6 +105,7 @@ const STORE_FLYER_URLS: Record<string, string> = {
   "adonis":                   "https://www.marchesadonis.com/flyer",
   "foody mart":               "https://flipp.com/en-ca/markham-on/flyer/foody-mart",
   "foody world":              "https://flipp.com/en-ca/markham-on/flyer/foody-world",
+  "rabba":                    "https://rabba.com/flyers/",
   // US stores
   "target":                   "https://www.target.com/weekly-ad",
   "kroger":                   "https://www.kroger.com/weeklyad",
