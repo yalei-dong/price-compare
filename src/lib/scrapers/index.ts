@@ -178,9 +178,14 @@ async function aiFilterRelevant(
   const prompt = `You are a grocery shopping assistant. The user searched for "${query}".
 Below is a list of products returned by various stores. For each, decide if it is a grocery/food/household item that genuinely matches what someone searching "${query}" would want to buy.
 
-Reject items that are:
+KEEP items that are:
+- The actual product the user is looking for (e.g. "garlic" → fresh garlic, garlic bulbs, minced garlic, garlic powder, garlic bread)
+- The product itself or a direct variant/form of it
+
+REJECT items that are:
 - Non-grocery products (electronics, clothing, party supplies, etc.)
-- Products where the search term is only a brand name, flavor, or modifier — not the actual product (e.g. searching "apple" should keep apples/apple juice but reject Apple Watch)
+- Products where the search term is only a brand name, flavor, ingredient, or seasoning modifier — not the main product (e.g. "garlic" → reject garlic shrimp, garlic chicken, garlic mayo; "apple" → reject Apple Watch, apple-flavored candy; "lemon" → reject lemon chicken, lemon cake)
+- The key test: would a customer searching for "${query}" actually want this product, or is "${query}" just one ingredient/flavor in a different product?
 
 Return ONLY a JSON array of the index numbers (the "i" values) to KEEP. No explanation.
 
