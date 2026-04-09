@@ -99,6 +99,8 @@ const STORE_FLYER_URLS: Record<string, string> = {
   "london drugs":             "https://www.londondrugs.com/flyer/",
   "rexall":                   "https://www.rexall.ca/flyer",
   "starsky":                  "https://starskys.com/flyer/",
+  "foody mart":               "https://flipp.com/en-ca/markham-on/flyer/foody-mart",
+  "foody world":              "https://flipp.com/en-ca/markham-on/flyer/foody-world",
   // US stores
   "target":                   "https://www.target.com/weekly-ad",
   "kroger":                   "https://www.kroger.com/weeklyad",
@@ -185,10 +187,7 @@ async function flippSearch(
     if (!productName) continue;
 
     const store = item.merchant_name || item.merchant || "Unknown Store";
-    // Link directly to the flyer item on Flipp when available
-    const flyerUrl = item.flyer_id && item.flyer_item_id
-      ? `https://flipp.com/flyer/${item.flyer_id}?item_id=${item.flyer_item_id}`
-      : buildStoreSearchUrl(store, query);
+    // Always link to the store's own flyer page (not Flipp)
     results.push({
       storeName: store,
       price,
@@ -197,7 +196,7 @@ async function flippSearch(
       imageUrl: item.clean_image_url || item.clipping_image_url || item.cutout_image_url || item.image_url || undefined,
       unit: parseUnit(item),
       validUntil: item.valid_to || undefined,
-      productUrl: flyerUrl,
+      productUrl: buildStoreSearchUrl(store, query),
     });
   }
 
