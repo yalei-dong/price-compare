@@ -165,7 +165,7 @@ const NON_FOOD_STORES = new Set([
   "petsmart", "pet valu", "ren's pets",
   "sportchek", "sport chek", "atmosphere", "sail",
   "marks", "mark's", "old navy", "gap", "h&m",
-  "toys r us", "mastermind toys",
+  "toys r us", "mastermind toys", "party city", "party packagers",
   "bath & body works", "sephora", "shoppers beauty",
   "henry's", "the camera store",
   "home furniture", "ashley", "bad boy", "surplus furniture",
