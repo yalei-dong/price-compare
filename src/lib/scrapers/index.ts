@@ -11,9 +11,10 @@ import { walmartScraper } from "./walmart";
 import { loblawScraper } from "./loblaw";
 import { costcoScraper } from "./costco";
 import { wholeFoodsScraper } from "./wholefoods";
+import { rabbaScraper } from "./rabba";
 
 // Register all scrapers
-const ALL_SCRAPERS: Scraper[] = [flippScraper, walmartScraper, loblawScraper, costcoScraper, wholeFoodsScraper];
+const ALL_SCRAPERS: Scraper[] = [flippScraper, walmartScraper, loblawScraper, costcoScraper, wholeFoodsScraper, rabbaScraper];
 
 // ---------------------------------------------------------------------------
 // In-memory cache for scraped results (24h TTL, same as SerpAPI cache)
