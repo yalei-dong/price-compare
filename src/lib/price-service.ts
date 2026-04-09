@@ -553,6 +553,40 @@ const FOOD_CAT = new Set([
   "cup", "cups", "bunny", "egg", "eggs", "cone", "wafer", "spread",
 ]);
 
+/**
+ * Pick the best thumbnail for a query from a set of price entries.
+ * Prefers items whose productName closely matches the query (avoids
+ * multi-item flyer deals like "WATER 4L, TOOTHPASTE 50ML" showing water).
+ */
+function pickBestThumbnail(prices: PriceEntry[], query: string): string {
+  const withThumb = prices.filter((p) => p.thumbnail);
+  if (withThumb.length === 0) return "";
+
+  const qWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
+
+  // Score each entry: how well does the product name match the query?
+  let best = withThumb[0];
+  let bestScore = -1;
+
+  for (const p of withThumb) {
+    const name = (p.productName || p.storeName || "").toLowerCase();
+    // Count how many query words appear AND penalize long names (multi-item deals)
+    const nameLen = name.split(/[\s,]+/).length;
+    let matched = 0;
+    for (const w of qWords) {
+      if (new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i").test(name)) matched++;
+    }
+    // Score: high match ratio, low name length
+    const score = (matched / Math.max(qWords.length, 1)) * 100 - nameLen;
+    if (score > bestScore) {
+      bestScore = score;
+      best = p;
+    }
+  }
+
+  return best.thumbnail || "";
+}
+
 function filterMisleadingResults(results: PriceEntry[], query: string): PriceEntry[] {
   const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
   if (queryWords.length <= 1) return results;
@@ -827,7 +861,7 @@ export async function searchProductsReal(
           const metro = geo ? getMetroConfig(geo) : undefined;
           const prices = await fetchGoogleShoppingPrices(item, localeCode, metro?.serpLocation);
           if (prices.length === 0) return null;
-          const thumb = prices.find((p) => p.thumbnail)?.thumbnail || "";
+          const thumb = pickBestThumbnail(prices, item);
           return {
             id: `live-${encodeURIComponent(item)}`,
             name: item,
@@ -870,12 +904,12 @@ export async function searchProductsReal(
   }
 
   // Build a single product from the live results
-  const firstThumbnail = filtered.find((p) => p.thumbnail)?.thumbnail || "";
+  const bestThumbnail = pickBestThumbnail(filtered, query);
   const liveProduct: Product = {
     id: `live-${encodeURIComponent(query)}`,
     name: query,
     category: category && category !== "all" ? category : "Search Result",
-    image: firstThumbnail || "🔍",
+    image: bestThumbnail || "🔍",
     description: `Live prices for "${query}" from Google Shopping`,
     prices: filtered,
   };
@@ -895,14 +929,7 @@ export async function getProductByIdReal(id: string, localeCode: string = "US"):
     const query = decodeURIComponent(id.replace("live-", ""));
     const prices = await fetchGoogleShoppingPrices(query, localeCode);
     if (prices.length > 0) {
-      // Pick thumbnail from the median-priced item (avoids outlier images
-      // from mismatched cheap or expensive items)
-      const withThumb = prices.filter((p) => p.thumbnail);
-      let thumb = "";
-      if (withThumb.length > 0) {
-        const sorted = [...withThumb].sort((a, b) => a.price - b.price);
-        thumb = sorted[Math.floor(sorted.length / 2)].thumbnail || "";
-      }
+      const thumb = pickBestThumbnail(prices, query);
       return {
         id,
         name: query,
