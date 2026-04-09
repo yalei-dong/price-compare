@@ -157,30 +157,105 @@ async function getCollections(
 }
 
 // ---- Step 4: Match search query to best collection(s) ----
+// Common food search terms → collection category mappings
+const CATEGORY_SYNONYMS: Record<string, string[]> = {
+  shrimp: ["shellfish", "seafood", "fish"],
+  prawn: ["shellfish", "seafood", "fish"],
+  lobster: ["shellfish", "seafood", "fish"],
+  crab: ["shellfish", "seafood", "fish"],
+  salmon: ["fish", "seafood"],
+  tuna: ["fish", "seafood"],
+  cod: ["fish", "seafood"],
+  tilapia: ["fish", "seafood"],
+  beef: ["meat", "frozen meat"],
+  steak: ["meat", "beef"],
+  pork: ["meat", "frozen meat"],
+  bacon: ["meat", "deli", "breakfast"],
+  sausage: ["meat", "deli", "breakfast"],
+  turkey: ["meat", "poultry"],
+  lamb: ["meat"],
+  yogurt: ["yogurt", "dairy"],
+  cheese: ["cheese", "dairy"],
+  cream: ["dairy", "cream"],
+  juice: ["juice", "beverages"],
+  coffee: ["coffee", "beverages"],
+  tea: ["tea", "beverages"],
+  water: ["water", "beverages"],
+  wine: ["wine", "alcohol"],
+  beer: ["beer", "alcohol"],
+  chips: ["chips", "snacks"],
+  cereal: ["cereal", "breakfast"],
+  pasta: ["pasta", "pantry"],
+  rice: ["rice", "grains", "pantry"],
+  soap: ["soap", "cleaning", "household"],
+  detergent: ["cleaning", "laundry", "household"],
+  toilet: ["paper", "bathroom", "household"],
+  diaper: ["baby", "diapers"],
+  vitamin: ["vitamins", "supplements", "health"],
+};
+
+function expandQuery(query: string): string[] {
+  const q = query.toLowerCase().trim();
+  const extras: string[] = [];
+  for (const [term, synonyms] of Object.entries(CATEGORY_SYNONYMS)) {
+    if (q.includes(term)) {
+      extras.push(...synonyms);
+    }
+  }
+  return extras;
+}
+
 function matchCollections(
   query: string,
   collections: CollectionInfo[]
 ): CollectionInfo[] {
   const q = query.toLowerCase().trim();
+  // Also try singular form (shrimps → shrimp)
+  const qSingular = q.endsWith("s") && q.length > 3 ? q.slice(0, -1) : q;
+  const variants = new Set([q, qSingular]);
   const matches: CollectionInfo[] = [];
 
   // Exact name match
   for (const c of collections) {
-    if (c.name.toLowerCase() === q) return [c];
+    const cn = c.name.toLowerCase();
+    if (variants.has(cn)) return [c];
   }
   // Name contains query or query contains name
   for (const c of collections) {
     const cn = c.name.toLowerCase();
-    if (cn.includes(q) || q.includes(cn)) matches.push(c);
+    for (const v of variants) {
+      if (cn.includes(v) || v.includes(cn)) {
+        matches.push(c);
+        break;
+      }
+    }
   }
   if (matches.length > 0) return matches.slice(0, 3);
 
-  // Word-level match
+  // Word-level match (including singular forms)
   const words = q.split(/\s+/);
+  const allWords = new Set(words);
   for (const w of words) {
+    if (w.endsWith("s") && w.length > 3) allWords.add(w.slice(0, -1));
+  }
+  for (const w of allWords) {
     if (w.length < 3) continue;
     for (const c of collections) {
-      if (c.name.toLowerCase().includes(w)) matches.push(c);
+      if (c.name.toLowerCase().includes(w) && !matches.includes(c)) {
+        matches.push(c);
+      }
+    }
+  }
+  if (matches.length > 0) return matches.slice(0, 3);
+
+  // Synonym/category expansion (shrimp → shellfish, seafood)
+  const expanded = expandQuery(q);
+  for (const syn of expanded) {
+    for (const c of collections) {
+      const cn = c.name.toLowerCase();
+      if (cn.includes(syn) && !matches.includes(c)) {
+        matches.push(c);
+      }
     }
   }
   if (matches.length > 0) return matches.slice(0, 3);
@@ -188,7 +263,8 @@ function matchCollections(
   // Slug match (slugs contain hyphenated words like rc-eggs-56903)
   for (const c of collections) {
     const slugWords = c.slug.replace(/[-_]/g, " ").toLowerCase();
-    if (slugWords.includes(q) || words.some((w) => slugWords.includes(w))) {
+    const allVariants = [...variants, ...Array.from(allWords)];
+    if (allVariants.some((v) => slugWords.includes(v))) {
       matches.push(c);
     }
   }
@@ -289,14 +365,19 @@ async function searchCostcoViaInstacart(
   const results: ScrapedPrice[] = [];
   const seen = new Set<string>();
   const q = query.toLowerCase();
+  // Build search variants: original + singular + synonyms
+  const qWords = q.split(/\s+/).filter((w) => w.length >= 3);
+  const searchTerms = new Set([q, ...qWords]);
+  // Add singular forms
+  for (const w of [...searchTerms]) {
+    if (w.endsWith("s") && w.length > 3) searchTerms.add(w.slice(0, -1));
+  }
 
   for (const items of allItems) {
     for (const item of items) {
       // Filter by relevance — product name should relate to search query
       const itemName = (item.name || "").toLowerCase();
-      const matches =
-        itemName.includes(q) ||
-        q.split(/\s+/).some((w) => w.length >= 3 && itemName.includes(w));
+      const matches = [...searchTerms].some((t) => itemName.includes(t));
       if (!matches && matched.length > 1) continue; // strict filter for multi-collection
 
       const sp = toScrapedPrice(item);
