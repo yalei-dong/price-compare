@@ -99,6 +99,9 @@ const STORE_FLYER_URLS: Record<string, string> = {
   "london drugs":             "https://www.londondrugs.com/flyer/",
   "rexall":                   "https://www.rexall.ca/flyer",
   "starsky":                  "https://starskys.com/flyer/",
+  "longos":                   "https://www.longos.com/flyers",
+  "longo's":                  "https://www.longos.com/flyers",
+  "adonis":                   "https://www.marchesadonis.com/flyer",
   "foody mart":               "https://flipp.com/en-ca/markham-on/flyer/foody-mart",
   "foody world":              "https://flipp.com/en-ca/markham-on/flyer/foody-world",
   // US stores
