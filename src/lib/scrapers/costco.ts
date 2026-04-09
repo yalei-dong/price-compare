@@ -187,6 +187,11 @@ const CATEGORY_SYNONYMS: Record<string, string[]> = {
   cereal: ["cereal", "breakfast"],
   pasta: ["pasta", "pantry"],
   rice: ["rice", "grains", "pantry"],
+  oil: ["pantry", "cooking", "condiments"],
+  vinegar: ["pantry", "condiments"],
+  flour: ["baking", "pantry"],
+  sugar: ["baking", "pantry"],
+  honey: ["pantry", "condiments"],
   soap: ["soap", "cleaning", "household"],
   detergent: ["cleaning", "laundry", "household"],
   toilet: ["paper", "bathroom", "household"],
@@ -210,9 +215,10 @@ function matchCollections(
   collections: CollectionInfo[]
 ): CollectionInfo[] {
   const q = query.toLowerCase().trim();
-  // Also try singular form (shrimps → shrimp)
+  // Try singular and plural forms
   const qSingular = q.endsWith("s") && q.length > 3 ? q.slice(0, -1) : q;
-  const variants = new Set([q, qSingular]);
+  const qPlural = !q.endsWith("s") ? q + "s" : q;
+  const variants = new Set([q, qSingular, qPlural]);
   const matches: CollectionInfo[] = [];
 
   // Exact name match
@@ -232,16 +238,18 @@ function matchCollections(
   }
   if (matches.length > 0) return matches.slice(0, 3);
 
-  // Word-level match (including singular forms)
+  // Word-level match (including singular + plural forms)
   const words = q.split(/\s+/);
   const allWords = new Set(words);
   for (const w of words) {
     if (w.endsWith("s") && w.length > 3) allWords.add(w.slice(0, -1));
+    if (!w.endsWith("s")) allWords.add(w + "s");
   }
   for (const w of allWords) {
     if (w.length < 3) continue;
+    const wRe = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i");
     for (const c of collections) {
-      if (c.name.toLowerCase().includes(w) && !matches.includes(c)) {
+      if (wRe.test(c.name) && !matches.includes(c)) {
         matches.push(c);
       }
     }
@@ -251,9 +259,9 @@ function matchCollections(
   // Synonym/category expansion (shrimp → shellfish, seafood)
   const expanded = expandQuery(q);
   for (const syn of expanded) {
+    const synRe = new RegExp(`\\b${syn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i");
     for (const c of collections) {
-      const cn = c.name.toLowerCase();
-      if (cn.includes(syn) && !matches.includes(c)) {
+      if (synRe.test(c.name) && !matches.includes(c)) {
         matches.push(c);
       }
     }
@@ -264,7 +272,10 @@ function matchCollections(
   for (const c of collections) {
     const slugWords = c.slug.replace(/[-_]/g, " ").toLowerCase();
     const allVariants = [...variants, ...Array.from(allWords)];
-    if (allVariants.some((v) => slugWords.includes(v))) {
+    if (allVariants.some((v) => {
+      const re = new RegExp(`\\b${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i");
+      return re.test(slugWords);
+    })) {
       matches.push(c);
     }
   }
@@ -365,20 +376,39 @@ async function searchCostcoViaInstacart(
   const results: ScrapedPrice[] = [];
   const seen = new Set<string>();
   const q = query.toLowerCase();
-  // Build search variants: original + singular + synonyms
-  const qWords = q.split(/\s+/).filter((w) => w.length >= 3);
-  const searchTerms = new Set([q, ...qWords]);
-  // Add singular forms
-  for (const w of [...searchTerms]) {
-    if (w.endsWith("s") && w.length > 3) searchTerms.add(w.slice(0, -1));
-  }
+  // Build search words: original query words + singular forms
+  const qWords = q.split(/\s+/).filter((w) => w.length >= 2);
+  const wordVariants: string[][] = qWords.map((w) => {
+    const variants = [w];
+    if (w.endsWith("s") && w.length > 3) variants.push(w.slice(0, -1));
+    return variants;
+  });
 
   for (const items of allItems) {
     for (const item of items) {
-      // Filter by relevance — product name should relate to search query
       const itemName = (item.name || "").toLowerCase();
-      const matches = [...searchTerms].some((t) => itemName.includes(t));
-      if (!matches && matched.length > 1) continue; // strict filter for multi-collection
+
+      // Relevance filter: for multi-word queries, require at least half the
+      // query words to appear as whole words (not substrings like "oil" in "foil")
+      if (qWords.length >= 2) {
+        let wordHits = 0;
+        for (const variants of wordVariants) {
+          // Check whole-word match to avoid "oil" matching "foil"
+          const hasMatch = variants.some((v) => {
+            const re = new RegExp(`\\b${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i");
+            return re.test(itemName);
+          });
+          if (hasMatch) wordHits++;
+        }
+        // Require at least half of query words to match
+        if (wordHits < Math.ceil(qWords.length / 2)) continue;
+      } else if (qWords.length === 1) {
+        // Single word: whole-word match
+        const w = qWords[0];
+        const wSingular = w.endsWith("s") && w.length > 3 ? w.slice(0, -1) : w;
+        const re = new RegExp(`\\b(${w}|${wSingular})`, "i");
+        if (!re.test(itemName)) continue;
+      }
 
       const sp = toScrapedPrice(item);
       if (!sp) continue;
