@@ -140,12 +140,20 @@ export const rabbaScraper: Scraper = {
 
     const results: ScrapedPrice[] = [];
 
+    // Two-pass matching: strong matches (query in first 2 words) are preferred;
+    // weak matches (query as trailing modifier e.g. "Schaaf Loaf Banana") are
+    // only included when no strong match exists.
+    type MatchedItem = { item: RabbaItem; strong: boolean };
+    const matched: MatchedItem[] = [];
+
     for (const item of allItems) {
       const nameLower = `${item.name} ${item.size}`.toLowerCase();
 
       // For multi-word queries, require all words
       if (queryWords.length > 1) {
         if (!queryWords.every((w) => nameLower.includes(w))) continue;
+        matched.push({ item, strong: true });
+        continue;
       } else if (queryWords.length === 1) {
         // Single word: whole-word boundary match
         const w = queryWords[0];
@@ -153,7 +161,19 @@ export const rabbaScraper: Scraper = {
           w.endsWith("s") && w.length > 3 ? w.slice(0, -1) : w;
         const re = new RegExp(`\\b(${w}|${wSingular})`, "i");
         if (!re.test(nameLower)) continue;
+
+        // Strong: query word appears in the first 2 words of the product name
+        const nameWords = item.name.toLowerCase().split(/\s+/).slice(0, 2);
+        const isStrong = nameWords.some((nw) => re.test(nw));
+        matched.push({ item, strong: isStrong });
+        continue;
       }
+    }
+
+    const hasStrong = matched.some((m) => m.strong);
+    const filtered = hasStrong ? matched.filter((m) => m.strong) : matched;
+
+    for (const { item } of filtered) {
 
       const fullName = item.size
         ? `${item.name}, ${item.size}`
