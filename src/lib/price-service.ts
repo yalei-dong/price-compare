@@ -540,6 +540,44 @@ async function fetchPricesFromFreeProviders(
 }
 
 // ---------------------------------------------------------------------------
+// Global relevance filter — applied to ALL results (scrapers + free + SerpAPI)
+// ---------------------------------------------------------------------------
+
+/** Food-category words used to detect misleading compound nouns */
+const FOOD_CAT = new Set([
+  "chocolate", "cheese", "cake", "bread", "juice", "sauce", "butter",
+  "cream", "wine", "beer", "coffee", "tea", "jam", "candy", "cookie",
+  "cracker", "chip", "bar", "powder", "cereal", "soup", "steak",
+  "sausage", "burger", "pie", "pudding", "yogurt", "vinegar", "oil",
+  "milk", "water", "flour", "sugar", "salt", "pepper", "rice", "pasta",
+  "cup", "cups", "bunny", "egg", "eggs", "cone", "wafer", "spread",
+]);
+
+function filterMisleadingResults(results: PriceEntry[], query: string): PriceEntry[] {
+  const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
+  if (queryWords.length <= 1) return results;
+
+  const querySet = new Set(queryWords);
+  const headNoun = queryWords[queryWords.length - 1];
+
+  return results.filter((r) => {
+    const name = (r.productName || "").toLowerCase();
+    if (!name) return true; // keep items with no name info
+
+    const nameWords = name.split(/[\s,/]+/).filter(Boolean);
+    for (let i = 0; i < nameWords.length - 1; i++) {
+      if (nameWords[i] === headNoun || nameWords[i].includes(headNoun)) {
+        const nextWord = nameWords[i + 1];
+        if (FOOD_CAT.has(nextWord) && !querySet.has(nextWord)) {
+          return false; // "peanut butter chocolate", "milk chocolate", etc.
+        }
+      }
+    }
+    return true;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Main price fetcher: Always scrape (free) + supplement with APIs if thin
 // ---------------------------------------------------------------------------
 
@@ -591,6 +629,9 @@ export async function fetchGoogleShoppingPrices(
       }
     }
   }
+
+  // Global relevance filter — remove misleading compound-noun matches
+  results = filterMisleadingResults(results, query);
 
   if (results.length > 0) {
     setCachedPrices(cKey, results);
