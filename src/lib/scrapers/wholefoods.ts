@@ -78,15 +78,16 @@ function toScrapedPrice(item: WFProduct, currency: string): ScrapedPrice | null 
     ? `${item.brand} ${item.name}`
     : item.name;
 
+  // Product slug URLs are broken (redirect to homepage/404).
+  // Link to search results so users can find the product.
+  const searchName = encodeURIComponent(item.name);
   const result: ScrapedPrice = {
     storeName: "Whole Foods",
     price,
     currency,
     productName: fullName,
     imageUrl: item.imageThumbnail || undefined,
-    productUrl: item.slug
-      ? `https://www.wholefoodsmarket.com/product/${item.slug}`
-      : "https://www.wholefoodsmarket.com/sales-flyer",
+    productUrl: `https://www.wholefoodsmarket.com/search?text=${searchName}`,
   };
 
   if (item.saleEndDate) {
