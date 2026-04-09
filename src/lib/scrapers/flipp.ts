@@ -98,6 +98,7 @@ const STORE_FLYER_URLS: Record<string, string> = {
   "save-on-foods":            "https://www.saveonfoods.com/flyer/",
   "london drugs":             "https://www.londondrugs.com/flyer/",
   "rexall":                   "https://www.rexall.ca/flyer",
+  "starsky":                  "https://starskys.com/flyer/",
   // US stores
   "target":                   "https://www.target.com/weekly-ad",
   "kroger":                   "https://www.kroger.com/weeklyad",

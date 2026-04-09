@@ -70,6 +70,7 @@ const STORE_META: Record<string, { logo: string; type: "online" | "local" | "bot
   "amazon":         { logo: "🅰️", type: "online" },
   "t&t":            { logo: "🏮", type: "both" },
   "farm boy":       { logo: "🌾", type: "local" },
+  "starsky":         { logo: "🇪🇺", type: "local" },
   "shoppers drug mart": { logo: "💊", type: "both" },
   "provigo":        { logo: "🏪", type: "both" },
   "maxi":           { logo: "🏪", type: "both" },
