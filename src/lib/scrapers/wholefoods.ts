@@ -67,7 +67,7 @@ async function searchWholeFoods(
   }
 }
 
-function toScrapedPrice(item: WFProduct, currency: string): ScrapedPrice | null {
+function toScrapedPrice(item: WFProduct, currency: string, countryCode: string): ScrapedPrice | null {
   if (!item.name) return null;
 
   // Prefer sale price, fall back to regular price
@@ -78,16 +78,17 @@ function toScrapedPrice(item: WFProduct, currency: string): ScrapedPrice | null 
     ? `${item.brand} ${item.name}`
     : item.name;
 
-  // Product slug URLs are broken (redirect to homepage/404).
-  // Link to search results so users can find the product.
+  // wholefoodsmarket.com product/search URLs are broken (Amazon 404).
+  // Link to Amazon Whole Foods search which actually works.
   const searchName = encodeURIComponent(item.name);
+  const amazonDomain = countryCode === "CA" ? "amazon.ca" : "amazon.com";
   const result: ScrapedPrice = {
     storeName: "Whole Foods",
     price,
     currency,
     productName: fullName,
     imageUrl: item.imageThumbnail || undefined,
-    productUrl: `https://www.wholefoodsmarket.com/search?text=${searchName}`,
+    productUrl: `https://www.${amazonDomain}/s?k=${searchName}&i=wholefoods`,
   };
 
   if (item.saleEndDate) {
@@ -178,7 +179,7 @@ export const wholeFoodsScraper: Scraper = {
     const seen = new Set<string>();
 
     for (const { item } of topItems) {
-      const sp = toScrapedPrice(item, currency);
+      const sp = toScrapedPrice(item, currency, countryCode);
       if (!sp) continue;
 
       const key = `${sp.productName}-${sp.price}`;
