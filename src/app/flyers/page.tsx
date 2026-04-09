@@ -19,6 +19,7 @@ export default function FlyersPage() {
   );
 
   const [filterType, setFilterType] = useState<string>("all");
+  const [previewStore, setPreviewStore] = useState<StoreFlyer | null>(null);
 
   const currentStores = useMemo(() => {
     if (filterType === "all") return data.stores;
@@ -78,11 +79,8 @@ export default function FlyersPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {currentStores.map((store) => (
-            <a
+            <div
               key={store.name}
-              href={store.flyerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
               className="group bg-white rounded-2xl border shadow-sm hover:shadow-lg hover:border-indigo-300 transition-all overflow-hidden"
             >
               <div className="p-5">
@@ -100,18 +98,26 @@ export default function FlyersPage() {
                       {t(TYPE_LABELS[store.type])}
                     </span>
                   </div>
-                  <span className="text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity text-lg">
-                    ↗
-                  </span>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-indigo-600 font-medium group-hover:underline">
-                    {t("flyers.viewFlyer")} →
-                  </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPreviewStore(store)}
+                    className="flex-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
+                  >
+                    👁️ Preview Flyer
+                  </button>
+                  <a
+                    href={store.flyerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 px-3 py-2 bg-gray-50 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors text-center"
+                  >
+                    ↗ Open Full
+                  </a>
                 </div>
               </div>
-            </a>
+            </div>
           ))}
         </div>
       )}
@@ -123,6 +129,53 @@ export default function FlyersPage() {
           <span className="text-blue-800 text-sm">{t("flyers.info")}</span>
         </div>
       </div>
+
+      {/* Flyer Preview Modal — opens flyer in new tab since most stores block iframes */}
+      {previewStore && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setPreviewStore(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="p-5 text-center">
+              <span className="text-5xl mb-3 block">{previewStore.logo}</span>
+              <h2 className="font-bold text-xl text-gray-900 mb-1">{previewStore.name}</h2>
+              <p className="text-gray-500 text-sm mb-6">Weekly Flyer & Deals</p>
+
+              <div className="space-y-3">
+                <a
+                  href={previewStore.flyerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full px-4 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors"
+                >
+                  📰 View Weekly Flyer
+                </a>
+                <a
+                  href={previewStore.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                >
+                  🌐 Visit Store Website
+                </a>
+                <a
+                  href={`https://www.google.com/maps/search/${encodeURIComponent(previewStore.name + " near me")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                >
+                  📍 Find Nearby Locations
+                </a>
+              </div>
+
+              <button
+                onClick={() => setPreviewStore(null)}
+                className="mt-4 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { Product, CURRENCY_SYMBOLS } from "@/lib/types";
 import ProductImage from "./ProductImage";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useWatchList } from "@/context/WatchListContext";
+import { useClippedDeals } from "@/context/ClippedDealsContext";
 
 interface ProductCardProps {
   product: Product;
@@ -18,6 +19,7 @@ export default function ProductCard({ product, onAddToList }: ProductCardProps) 
   const router = useRouter();
   const [addedFlash, setAddedFlash] = useState(false);
   const { isWatching, addItem: addToWatch, removeItem: removeFromWatch } = useWatchList();
+  const { clipDeal, unclipDeal, isClipped, deals } = useClippedDeals();
   const watching = isWatching(product.id);
   const lowestPrice = product.prices.reduce(
     (min, p) => (p.inStock && p.price < min.price ? p : min),
@@ -84,6 +86,42 @@ export default function ProductCard({ product, onAddToList }: ProductCardProps) 
                     📋 Flyer Deal{lowestPrice.validUntil ? ` · Ends ${new Date(lowestPrice.validUntil).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}` : ""}
                   </span>
                 )}
+                {/* Clip coupon button */}
+                {(() => {
+                  const clipped = isClipped(lowestPrice.storeName, product.name);
+                  const clipId = deals.find((d) => d.storeName === lowestPrice.storeName && d.productName === product.name)?.id;
+                  return (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (clipped && clipId) {
+                          unclipDeal(clipId);
+                        } else {
+                          clipDeal({
+                            storeName: lowestPrice.storeName,
+                            storeLogo: lowestPrice.storeLogo,
+                            productName: product.name,
+                            price: lowestPrice.price,
+                            currency: lowestPrice.currency,
+                            unit: lowestPrice.unit,
+                            validUntil: lowestPrice.validUntil,
+                            flyerUrl: lowestPrice.url,
+                            thumbnail: lowestPrice.thumbnail,
+                          });
+                        }
+                      }}
+                      className={`text-xs px-1.5 py-0.5 rounded font-medium transition-colors ${
+                        clipped
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-600"
+                      }`}
+                      title={clipped ? "Unclip deal" : "Clip this deal"}
+                    >
+                      {clipped ? "✂️ Clipped" : "✂️ Clip"}
+                    </button>
+                  );
+                })()}
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-green-700">

@@ -386,7 +386,7 @@ interface CacheEntry {
 }
 
 const SERP_CACHE = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour (short to avoid stale results after deploys)
 const MAX_CACHE_SIZE = 500;               // evict oldest when exceeded
 
 function serpCacheKey(query: string, country: string, location?: string): string {

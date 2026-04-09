@@ -9,9 +9,10 @@ import { ScrapedPrice, Scraper } from "./types";
 import { flippScraper } from "./flipp";
 import { walmartScraper } from "./walmart";
 import { loblawScraper } from "./loblaw";
+import { costcoScraper } from "./costco";
 
 // Register all scrapers
-const ALL_SCRAPERS: Scraper[] = [flippScraper, walmartScraper, loblawScraper];
+const ALL_SCRAPERS: Scraper[] = [flippScraper, walmartScraper, loblawScraper, costcoScraper];
 
 // ---------------------------------------------------------------------------
 // In-memory cache for scraped results (24h TTL, same as SerpAPI cache)
@@ -23,7 +24,7 @@ interface CacheEntry {
 }
 
 const SCRAPE_CACHE = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const MAX_CACHE_SIZE = 500;
 
 function cacheKey(query: string, country: string): string {

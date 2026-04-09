@@ -118,6 +118,8 @@ export default function Navbar() {
     { href: "/ai-deals", label: "AI Deals", icon: "🤖" },
     { href: "/budget", label: t("nav.budget"), icon: "🥗" },
     { href: "/flyers", label: t("nav.flyers"), icon: "📰" },
+    { href: "/clipped", label: "Clipped", icon: "✂️" },
+    { href: "/stores", label: "Stores", icon: "📍" },
     { href: "/receipts", label: t("nav.receipts"), icon: "🧾" },
     { href: "/watch-list", label: t("nav.watchList"), icon: "👁️" },
     { href: "/shopping-list", label: t("nav.shoppingList"), icon: "🛒" },

@@ -60,7 +60,8 @@ async function scrapeBanner(
       },
     });
 
-    if (!res.ok) {
+    const contentType = res.headers.get("content-type") || "";
+    if (!res.ok || !contentType.includes("application/json")) {
       // Fallback: try the HTML search page and extract JSON-LD
       return scrapeBannerHTML(banner, query);
     }
