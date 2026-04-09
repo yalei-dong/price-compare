@@ -150,6 +150,79 @@ function dedup(entries: PriceEntry[]): PriceEntry[] {
 }
 
 // ---------------------------------------------------------------------------
+// AI-based grocery relevance filter
+// Uses Gemini to classify whether each product is a grocery/food item that
+// actually matches the search query. Falls back to no filtering on failure.
+// ---------------------------------------------------------------------------
+
+async function aiFilterRelevant(
+  entries: PriceEntry[],
+  query: string
+): Promise<PriceEntry[]> {
+  if (entries.length === 0) return entries;
+
+  const allKeys = (process.env.GEMINI_API_KEY || "")
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+  if (allKeys.length === 0) return entries; // no API key — skip filter
+
+  // Build a compact list for the AI: index + product name + store
+  const items = entries.map((e, i) => ({
+    i,
+    name: e.productName || e.storeName,
+    store: e.storeName,
+    price: e.price,
+  }));
+
+  const prompt = `You are a grocery shopping assistant. The user searched for "${query}".
+Below is a list of products returned by various stores. For each, decide if it is a grocery/food/household item that genuinely matches what someone searching "${query}" would want to buy.
+
+Reject items that are:
+- Non-grocery products (electronics, clothing, party supplies, etc.)
+- Products where the search term is only a brand name, flavor, or modifier — not the actual product (e.g. searching "apple" should keep apples/apple juice but reject Apple Watch)
+
+Return ONLY a JSON array of the index numbers (the "i" values) to KEEP. No explanation.
+
+Products:
+${JSON.stringify(items)}`;
+
+  try {
+    const key = allKeys[Math.floor(Math.random() * allKeys.length)];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 256, temperature: 0 },
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!res.ok) return entries;
+
+    const data = await res.json();
+    const text: string =
+      data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    // Extract JSON array from response (may be wrapped in markdown code fences)
+    const match = text.match(/\[[\d,\s]*\]/);
+    if (!match) return entries;
+
+    const keepIndices: number[] = JSON.parse(match[0]);
+    const keepSet = new Set(keepIndices);
+    const filtered = entries.filter((_, i) => keepSet.has(i));
+
+    // Safety: if AI removed everything, return originals
+    return filtered.length > 0 ? filtered : entries;
+  } catch (err) {
+    console.warn("AI filter failed, returning unfiltered results:", err);
+    return entries;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Public API: fetch scraped prices
 // ---------------------------------------------------------------------------
 
@@ -184,7 +257,8 @@ export async function fetchScrapedPrices(
 
   if (allScraped.length === 0) return [];
 
-  const entries = dedup(toPriceEntries(allScraped, countryCode));
+  const deduped = dedup(toPriceEntries(allScraped, countryCode));
+  const entries = await aiFilterRelevant(deduped, query);
   setCache(key, entries);
   return entries;
 }
