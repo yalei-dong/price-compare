@@ -388,9 +388,11 @@ interface CacheEntry {
 const SERP_CACHE = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour (short to avoid stale results after deploys)
 const MAX_CACHE_SIZE = 500;               // evict oldest when exceeded
+// Build-time version — changes on every deploy to bust stale cache
+const CACHE_VERSION = Date.now().toString(36);
 
 function serpCacheKey(query: string, country: string, location?: string): string {
-  return `${query.toLowerCase().trim()}|${country}|${location || ""}`;
+  return `${CACHE_VERSION}|${query.toLowerCase().trim()}|${country}|${location || ""}`;
 }
 
 function getCachedPrices(key: string): PriceEntry[] | null {
