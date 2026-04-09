@@ -120,19 +120,63 @@ export const wholeFoodsScraper: Scraper = {
     // Relevance filter: query words must appear in product name or brand
     const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
 
-    const results: ScrapedPrice[] = [];
-    const seen = new Set<string>();
+    // Build plural/singular forms for matching
+    const queryForms = queryWords.map((w) => {
+      const forms = [w];
+      if (!w.endsWith("s")) forms.push(w + "s");
+      if (w.endsWith("s") && w.length > 3) forms.push(w.slice(0, -1));
+      if (w.endsWith("ies")) forms.push(w.slice(0, -3) + "y");
+      if (w.endsWith("y")) forms.push(w.slice(0, -1) + "ies");
+      return forms;
+    });
+
+    const scored: { item: WFProduct; score: number }[] = [];
 
     for (const item of products) {
       const combined = `${item.brand || ""} ${item.name || ""}`.toLowerCase();
 
-      // For multi-word queries, require all query words
-      if (queryWords.length > 1) {
-        if (!queryWords.every((w) => combined.includes(w))) continue;
-      } else if (queryWords.length === 1) {
-        if (!combined.includes(queryWords[0])) continue;
+      // Basic filter: all query words must appear (with word-boundary)
+      const allMatch = queryWords.every((w) =>
+        new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i").test(combined)
+      );
+      if (!allMatch) continue;
+
+      // Relevance score: higher = query word is the actual product, not a modifier
+      let score = 0;
+      const nameWords = (item.name || "").toLowerCase().split(/[\s,]+/).filter((nw) => nw.length > 1);
+
+      for (const forms of queryForms) {
+        // +3 if query word (or plural) is near the END of the product name
+        // (meaning it's the main noun, e.g. "Navel Oranges" vs "Orange Sparkling Water")
+        const lastThree = nameWords.slice(-3);
+        if (forms.some((f) => lastThree.includes(f))) score += 3;
+
+        // +2 if query word appears as a standalone word at all (not just substring)
+        if (forms.some((f) => new RegExp(`\\b${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(item.name || ""))) score += 2;
       }
 
+      // Shorter product names are more likely to be the actual product
+      if (nameWords.length <= 3) score += 2;
+      else if (nameWords.length <= 5) score += 1;
+
+      scored.push({ item, score });
+    }
+
+    // Sort by relevance score desc, then by price asc
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const priceA = a.item.salePrice || a.item.regularPrice || 999;
+      const priceB = b.item.salePrice || b.item.regularPrice || 999;
+      return priceA - priceB;
+    });
+
+    // Take only the top results (most relevant)
+    const topItems = scored.slice(0, 10);
+
+    const results: ScrapedPrice[] = [];
+    const seen = new Set<string>();
+
+    for (const { item } of topItems) {
       const sp = toScrapedPrice(item, currency);
       if (!sp) continue;
 
