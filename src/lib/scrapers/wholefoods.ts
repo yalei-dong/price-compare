@@ -78,17 +78,15 @@ function toScrapedPrice(item: WFProduct, currency: string, countryCode: string):
     ? `${item.brand} ${item.name}`
     : item.name;
 
-  // wholefoodsmarket.com product/search URLs are broken (Amazon 404).
-  // Link to Amazon Whole Foods search which actually works.
-  const searchName = encodeURIComponent(item.name);
-  const amazonDomain = countryCode === "CA" ? "amazon.ca" : "amazon.com";
+  // wholefoodsmarket.com product URLs are all broken (redirect to Amazon 404).
+  // Link to the sales flyer page which is the only reliable WF URL.
   const result: ScrapedPrice = {
     storeName: "Whole Foods",
     price,
     currency,
     productName: fullName,
     imageUrl: item.imageThumbnail || undefined,
-    productUrl: `https://www.${amazonDomain}/s?k=${searchName}&i=wholefoods`,
+    productUrl: "https://www.wholefoodsmarket.com/sales-flyer",
   };
 
   if (item.saleEndDate) {
