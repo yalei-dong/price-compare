@@ -154,6 +154,24 @@ function broadenQuery(query: string): string | null {
   return null;
 }
 
+// Non-food stores to exclude from grocery search results
+const NON_FOOD_STORES = new Set([
+  "home hardware", "home depot", "lowes", "lowe's", "rona",
+  "canadian tire", "princess auto", "peavey mart",
+  "long & mcquade", "long and mcquade", "best buy", "the source",
+  "the brick", "leon's", "sleep country", "ikea", "structube",
+  "winners", "homesense", "marshalls", "dollarama",
+  "staples", "bureau en gros", "michaels", "indigo",
+  "petsmart", "pet valu", "ren's pets",
+  "sportchek", "sport chek", "atmosphere", "sail",
+  "marks", "mark's", "old navy", "gap", "h&m",
+  "toys r us", "mastermind toys",
+  "bath & body works", "sephora", "shoppers beauty",
+  "henry's", "the camera store",
+  "home furniture", "ashley", "bad boy", "surplus furniture",
+  "tsc stores", "peavey industries",
+]);
+
 async function flippSearch(
   query: string,
   countryCode: string,
@@ -192,6 +210,10 @@ async function flippSearch(
     if (!productName) continue;
 
     const store = item.merchant_name || item.merchant || "Unknown Store";
+
+    // Skip non-food stores
+    if (NON_FOOD_STORES.has(store.toLowerCase().trim())) continue;
+
     const imageUrl = item.clean_image_url || item.clipping_image_url || item.cutout_image_url || item.image_url || undefined;
     const unit = parseUnit(item);
 
