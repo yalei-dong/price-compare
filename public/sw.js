@@ -1,16 +1,7 @@
-const CACHE_NAME = "pricecompare-v2";
+const CACHE_NAME = "pricecompare-v3";
 
-// Assets to cache on install
+// Assets to cache on install — only icons and manifest (not HTML pages)
 const PRECACHE_ASSETS = [
-  "/",
-  "/budget",
-  "/party",
-  "/flyers",
-  "/receipt-scan",
-  "/my-prices",
-  "/watch-list",
-  "/shopping-list",
-  "/scan",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -38,7 +29,10 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch — network-first for API, cache-first for static assets
+// Fetch strategy:
+// - API requests: network only
+// - HTML pages: network first, fall back to cache
+// - Static assets (_next/): cache first
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
@@ -48,25 +42,30 @@ self.addEventListener("fetch", (event) => {
   // API requests — network only (prices must be fresh)
   if (url.pathname.startsWith("/api/")) return;
 
-  // HTML pages & static assets — stale-while-revalidate
-  event.respondWith(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      const cachedResponse = await cache.match(event.request);
-      const fetchPromise = fetch(event.request)
-        .then((networkResponse) => {
-          // Cache successful responses
-          if (networkResponse.ok) {
-            cache.put(event.request, networkResponse.clone());
-          }
-          return networkResponse;
-        })
-        .catch(() => {
-          // Offline fallback — return cached or a basic offline page
-          return cachedResponse;
-        });
+  // Static assets (_next/) — cache first
+  if (url.pathname.startsWith("/_next/")) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(event.request);
+        if (cached) return cached;
+        const response = await fetch(event.request);
+        if (response.ok) cache.put(event.request, response.clone());
+        return response;
+      })
+    );
+    return;
+  }
 
-      // Return cached immediately, update in background
-      return cachedResponse || fetchPromise;
-    })
+  // HTML pages — network first, fall back to cache for offline
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
