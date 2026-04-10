@@ -367,6 +367,41 @@ const KNOWN_FOODS = new Set([
   "hazelnut", "hazelnuts", "sunflower", "sesame", "chia", "flax",
 ]);
 
+/**
+ * Detect if a food query word is used as a qualifier/descriptor in the product
+ * name rather than as the main product.
+ */
+const QUALIFIER_PREFIXES = ["zero", "no", "low", "reduced", "less", "free", "unsweetened", "lite", "light", "diet"];
+const QUALIFIER_SUFFIXES = ["free", "less", "reduced", "light", "lite"];
+const PRODUCT_BRANDS = new Set([
+  "pepsi", "coca-cola", "coca", "coke", "sprite", "fanta", "7up", "dr",
+  "mountain", "gatorade", "powerade", "redbull", "monster", "rockstar",
+  "nestea", "snapple", "minute", "tropicana", "oasis", "ocean", "sunkist",
+  "kellogg", "kelloggs", "general", "quaker", "post", "nature",
+  "kraft", "heinz", "hellmann", "hellmanns", "french's", "frenchs",
+  "campbell", "campbells", "knorr", "lipton",
+  "oreo", "chips", "doritos", "lays", "pringles", "ruffles", "tostitos",
+  "hershey", "hersheys", "cadbury", "lindt", "ferrero", "kitkat", "kit",
+  "dove", "colgate", "crest", "oral-b", "sensodyne", "listerine",
+  "tide", "downy", "gain", "bounce", "oxiclean", "dawn",
+  "glade", "febreze", "glad",
+  "huggies", "pampers",
+]);
+
+function isFoodUsedAsQualifier(productName: string, foodWord: string): boolean {
+  const lower = productName.toLowerCase();
+  for (const prefix of QUALIFIER_PREFIXES) {
+    if (lower.includes(`${prefix} ${foodWord}`)) return true;
+  }
+  for (const suffix of QUALIFIER_SUFFIXES) {
+    if (lower.includes(`${foodWord} ${suffix}`)) return true;
+    if (lower.includes(`${foodWord}-${suffix}`)) return true;
+  }
+  const words = lower.split(/[\s,/&+]+/);
+  if (words.some((w) => PRODUCT_BRANDS.has(w))) return true;
+  return false;
+}
+
 function filterRelevant(results: ScrapedPrice[], query: string): ScrapedPrice[] {
   const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
   const isQueryFood = queryWords.some((w) => KNOWN_FOODS.has(w));
@@ -399,6 +434,8 @@ function filterRelevant(results: ScrapedPrice[], query: string): ScrapedPrice[] 
           // If another food/product word appears, this is a combination
           if (KNOWN_FOODS.has(w)) return false;
         }
+        // Also reject if the food word is used as a qualifier
+        if (isFoodUsedAsQualifier(r.productName || "", qw)) return false;
         return true;
       });
     }

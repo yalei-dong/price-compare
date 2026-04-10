@@ -657,6 +657,48 @@ function isNonFoodItem(name: string): boolean {
 }
 
 /**
+ * Detect if a food query word is used as a qualifier/descriptor in the product
+ * name rather than as the main product. e.g. "zero sugar", "sugar free",
+ * "no salt", "fat free", "low sodium", "Pepsi Zero Sugar".
+ */
+const QUALIFIER_PREFIXES = ["zero", "no", "low", "reduced", "less", "free", "unsweetened", "lite", "light", "diet"];
+const QUALIFIER_SUFFIXES = ["free", "less", "reduced", "light", "lite"];
+
+/** Well-known brand names — these indicate the product is something else, not
+ *  the raw food ingredient being searched for. */
+const PRODUCT_BRANDS = new Set([
+  "pepsi", "coca-cola", "coca", "coke", "sprite", "fanta", "7up", "dr",
+  "mountain", "gatorade", "powerade", "redbull", "monster", "rockstar",
+  "nestea", "snapple", "minute", "tropicana", "oasis", "ocean", "sunkist",
+  "kellogg", "kelloggs", "general", "quaker", "post", "nature",
+  "kraft", "heinz", "hellmann", "hellmanns", "french's", "frenchs",
+  "campbell", "campbells", "knorr", "lipton",
+  "oreo", "chips", "doritos", "lays", "pringles", "ruffles", "tostitos",
+  "hershey", "hersheys", "cadbury", "lindt", "ferrero", "kitkat", "kit",
+  "dove", "colgate", "crest", "oral-b", "sensodyne", "listerine",
+  "tide", "downy", "gain", "bounce", "oxiclean", "dawn",
+  "glade", "febreze", "glad",
+  "huggies", "pampers",
+]);
+
+function isFoodUsedAsQualifier(productName: string, foodWord: string): boolean {
+  const lower = productName.toLowerCase();
+  // Check "zero sugar", "no salt", "low fat", etc.
+  for (const prefix of QUALIFIER_PREFIXES) {
+    if (lower.includes(`${prefix} ${foodWord}`)) return true;
+  }
+  // Check "sugar free", "salt free", "fat free", etc.
+  for (const suffix of QUALIFIER_SUFFIXES) {
+    if (lower.includes(`${foodWord} ${suffix}`)) return true;
+    if (lower.includes(`${foodWord}-${suffix}`)) return true;
+  }
+  // Check if a well-known brand appears — indicates the product is something else
+  const words = lower.split(/[\s,/&+]+/);
+  if (words.some((w) => PRODUCT_BRANDS.has(w))) return true;
+  return false;
+}
+
+/**
  * Pick the best thumbnail for a query from a set of price entries.
  * Prefers items whose productName closely matches the query (avoids
  * multi-item flyer deals like "WATER 4L, TOOTHPASTE 50ML" showing water).
@@ -709,6 +751,12 @@ function filterMisleadingResults(results: PriceEntry[], query: string): PriceEnt
 
     // Product name must contain every query word
     if (!queryWords.every((w) => name.includes(w))) return false;
+
+    // Reject products where the food word is used as a qualifier
+    // e.g. "Pepsi Zero Sugar" when searching "sugar"
+    for (const qw of queryWords) {
+      if (KNOWN_FOODS.has(qw) && isFoodUsedAsQualifier(name, qw)) return false;
+    }
 
     const nameWords = name.split(/[\s,/&+]+/).filter(Boolean);
 
