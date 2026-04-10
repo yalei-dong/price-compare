@@ -316,15 +316,50 @@ export default function AIDealsPage() {
   );
 }
 
+/** Rejoin markdown links that got split across multiple lines by the AI */
+function fixBrokenLinks(text: string): string {
+  // Find every "[...](..." pattern and collapse any whitespace/newlines until the closing ")"
+  let result = "";
+  let i = 0;
+  while (i < text.length) {
+    // Look for start of a markdown link: [
+    if (text[i] === "[") {
+      // Find the matching ]
+      const closeBracket = text.indexOf("]", i + 1);
+      if (closeBracket !== -1) {
+        // Check if followed by ( (possibly with whitespace/newlines)
+        let afterBracket = closeBracket + 1;
+        while (afterBracket < text.length && /[\s\n\r]/.test(text[afterBracket])) afterBracket++;
+        if (afterBracket < text.length && text[afterBracket] === "(") {
+          // Find the closing ) — skip whitespace/newlines inside
+          let depth = 1;
+          let urlEnd = afterBracket + 1;
+          while (urlEnd < text.length && depth > 0) {
+            if (text[urlEnd] === "(") depth++;
+            else if (text[urlEnd] === ")") depth--;
+            if (depth > 0) urlEnd++;
+          }
+          if (depth === 0) {
+            const linkText = text.slice(i + 1, closeBracket);
+            const url = text.slice(afterBracket + 1, urlEnd).replace(/[\s\n\r]+/g, "");
+            result += `[${linkText}](${url})`;
+            i = urlEnd + 1;
+            continue;
+          }
+        }
+      }
+    }
+    result += text[i];
+    i++;
+  }
+  return result;
+}
+
 /** Simple markdown renderer for AI responses */
 function MarkdownContent({ content }: { content: string }) {
   if (!content) return null;
 
-  // Rejoin markdown links that got split across lines
-  const fixed = content.replace(/\[([^\]]+)\]\(\s*\n\s*/g, "[$1](")
-    .replace(/\]\(\s*(https?:\/\/[^\s)]*)\s*\n\s*([^\s)]*\))/g, "]($1$2");
-  // Also collapse any remaining line breaks inside parentheses of links
-  const rejoined = fixed.replace(/(\[[^\]]+\]\([^\s)]*)\n\s*([^\s)]*\))/g, "$1$2");
+  const rejoined = fixBrokenLinks(content);
 
   const lines = rejoined.split("\n");
   const elements: React.ReactNode[] = [];
