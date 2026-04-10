@@ -38,11 +38,14 @@ export async function POST(request: NextRequest) {
   // Extract likely grocery search terms from the user's prompt
   const searchTerms = extractSearchTerms(userPrompt);
 
-  // Fetch real prices for the extracted terms (up to 6 parallel searches)
-  const priceData = await fetchPriceContext(searchTerms, country, geo);
+  // Fetch real prices and flyer deals in parallel
+  const [priceData, flyerDeals] = await Promise.all([
+    fetchPriceContext(searchTerms, country, geo),
+    fetchFlyerDeals(searchTerms, country),
+  ]);
 
-  // Build the system prompt with real price data
-  const systemPrompt = buildSystemPrompt(country, city, priceData, shoppingList, searchHistory);
+  // Build the system prompt with real price data + flyer context
+  const systemPrompt = buildSystemPrompt(country, city, priceData, shoppingList, searchHistory, flyerDeals);
 
   // --- Provider cascade: Gemini → Groq → template fallback ---
   const aiStream = await tryGeminiStream(systemPrompt, userPrompt)
@@ -435,8 +438,81 @@ async function fetchPriceContext(
   return results.join("\n\n---\n\n");
 }
 
+/** Fetch current flyer deals for search terms from Flipp */
+async function fetchFlyerDeals(terms: string[], country: string): Promise<string> {
+  if (terms.length === 0) return "";
+
+  const localeCode = country === "CA" ? "en-ca" : "en-us";
+  const postalCode = country === "CA" ? "M5V 3L9" : "10001";
+  const HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    Accept: "application/json",
+  };
+
+  try {
+    const allItems: { name: string; store: string; price: number; original?: number; sale?: string }[] = [];
+    const results = await Promise.allSettled(
+      terms.slice(0, 6).map(async (q) => {
+        const params = new URLSearchParams({ locale: localeCode, postal_code: postalCode, q });
+        const res = await fetch(`https://backflipp.wishabi.com/flipp/items/search?${params}`, { headers: HEADERS });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (data.items || []).filter(
+          (i: Record<string, unknown>) => i.name && i.merchant_name && i.current_price && (i.current_price as number) > 0
+        ).slice(0, 5).map((i: Record<string, unknown>) => ({
+          name: i.name as string,
+          store: i.merchant_name as string,
+          price: i.current_price as number,
+          original: (i.original_price as number) || undefined,
+          sale: (i.sale_story as string) || undefined,
+        }));
+      })
+    );
+
+    for (const r of results) {
+      if (r.status === "fulfilled") allItems.push(...r.value);
+    }
+
+    if (allItems.length === 0) return "";
+
+    // Group by store for one-store analysis
+    const byStore = new Map<string, typeof allItems>();
+    for (const item of allItems) {
+      const key = item.store.toLowerCase();
+      if (!byStore.has(key)) byStore.set(key, []);
+      byStore.get(key)!.push(item);
+    }
+
+    const sections: string[] = [];
+    sections.push("CURRENT FLYER DEALS (active this week):");
+    for (const item of allItems) {
+      const saving = item.original ? ` (was $${item.original.toFixed(2)})` : "";
+      const sale = item.sale ? ` — ${item.sale}` : "";
+      sections.push(`  - ${item.store}: ${item.name} — $${item.price.toFixed(2)}${saving}${sale}`);
+    }
+
+    // Best single-store summary
+    let bestStore = "";
+    let bestCount = 0;
+    for (const [store, items] of byStore) {
+      if (items.length > bestCount) {
+        bestCount = items.length;
+        bestStore = store;
+      }
+    }
+    if (bestStore) {
+      const storeItems = byStore.get(bestStore)!;
+      sections.push(`\nBEST SINGLE-STORE OPTION: ${storeItems[0].store} has ${bestCount} of the searched items on flyer deal.`);
+    }
+
+    return sections.join("\n");
+  } catch {
+    return "";
+  }
+}
+
 /** Build the system prompt with price context */
-function buildSystemPrompt(country: string, city: string, priceData: string, shoppingList: string[] = [], searchHistory: string[] = []): string {
+function buildSystemPrompt(country: string, city: string, priceData: string, shoppingList: string[] = [], searchHistory: string[] = [], flyerDeals: string = ""): string {
   const location = city ? `${city}, ${country}` : country;
 
   let userContext = "";
@@ -460,6 +536,7 @@ YOUR CAPABILITIES:
 
 CURRENT REAL PRICE DATA:
 ${priceData}
+${flyerDeals ? `\n${flyerDeals}` : ""}
 ${userContext}
 
 GUIDELINES:
@@ -476,6 +553,8 @@ GUIDELINES:
 - Mention if a deal is in-store only vs. online.
 - Always make store names clickable Google Maps directions links. Just hyperlink the store name itself — do NOT add extra text like "Get directions to". Format: [Store Name](https://www.google.com/maps/dir/?api=1&destination=Store+Name+City). Use the user's city in the destination if known. Example: [Walmart](https://www.google.com/maps/dir/?api=1&destination=Walmart+Toronto)
 - Keep responses focused and actionable — this is a shopping assistant, not a chatbot.
+- When flyer deals data is available, USE IT. Flyer deals often have the best prices. Mention the flyer deal price and if it was discounted from an original price.
+- ONE-STORE STRATEGY: When the user asks about their shopping list, also suggest a "one-store trip" option — the single store that has the most items on flyer deal. Show what they can get there (even if different brands), the total cost at that store, and compare it to the multi-store savings. Sometimes convenience beats saving a few dollars. Include the store's flyer link if known.
 - IMPORTANT: When the user asks about their shopping list, be CONCISE. For each item show ONLY the cheapest store and price in a compact table or list — do NOT list every store. Then show a total cost, total savings, and recommend the single best store with directions. Example format:
   | Item | Cheapest | Price |
   |------|----------|-------|
