@@ -585,7 +585,8 @@ const KNOWN_FOODS = new Set([
   "sauce", "soup", "stew", "broth", "stock", "paste", "salsa", "ketchup",
   "mustard", "mayo", "mayonnaise", "vinegar", "oil", "dressing", "marinade",
   "syrup", "honey", "jelly", "jam", "spread", "hummus", "dip", "chutney",
-  "relish", "gravy", "pesto",
+  "relish", "gravy", "pesto", "vinaigrette", "aioli", "glaze", "reduction",
+  "marmalade", "preserve", "preserves", "compote", "coulis",
 
   // Prepared & Frozen
   "pizza", "burger", "burgers", "nuggets", "meatball", "meatballs",
@@ -595,10 +596,13 @@ const KNOWN_FOODS = new Set([
   // Beverages
   "water", "juice", "coffee", "tea", "beer", "wine", "soda", "pop",
   "cola", "cider", "lemonade", "smoothie", "kombucha",
+  "cocktail", "spritzer", "punch", "sangria", "liqueur",
 
   // Snacks & Sweets
   "chocolate", "candy", "cookie", "cookies", "cake", "brownie", "brownies",
   "pudding", "ice cream", "wafer", "cone", "bar", "gum",
+  "sorbet", "gelato", "sherbet", "popsicle", "ice",
+  "gummy", "gummies", "treat", "treats", "snack", "snacks",
 
   // Baking & Staples
   "sugar", "salt", "pepper", "cinnamon", "cumin", "turmeric", "paprika",
@@ -688,30 +692,24 @@ function filterMisleadingResults(results: PriceEntry[], query: string): PriceEnt
 
     const nameWords = name.split(/[\s,/&+]+/).filter(Boolean);
 
-    // When a query word is a known food, reject products that combine it
-    // with ANOTHER known food word — in either direction.
-    // e.g. "garlic" → reject "garlic shrimp", "garlic bread", "garlic chicken"
-    //      "tomato" → reject "tomato sauce", "tomato soup"
+    // When a query word is a known food, reject products that contain
+    // ANY other known food/product-type word not in the query.
+    // e.g. "garlic" → reject "garlic shrimp", "garlic bread"
+    //      "raspberry" → reject "raspberry vinaigrette", "raspberry lemonade"
     //      "peanut butter" → reject "peanut butter chocolate" (but keep "peanut butter")
     for (const qw of queryWords) {
-      if (!KNOWN_FOODS.has(qw)) continue; // only apply to food queries
-      for (let i = 0; i < nameWords.length; i++) {
-        if (nameWords[i] === qw || nameWords[i].includes(qw)) {
-          // Check word AFTER the query word
-          if (i < nameWords.length - 1) {
-            const nextWord = nameWords[i + 1];
-            if (KNOWN_FOODS.has(nextWord) && !querySet.has(nextWord)) {
-              return false;
-            }
-          }
-          // Check word BEFORE the query word
-          if (i > 0) {
-            const prevWord = nameWords[i - 1];
-            if (KNOWN_FOODS.has(prevWord) && !querySet.has(prevWord)) {
-              return false;
-            }
-          }
+      if (!KNOWN_FOODS.has(qw)) continue;
+      for (const w of nameWords) {
+        // Skip words that match any query word (incl. plurals)
+        if (querySet.has(w)) continue;
+        let matchesQuery = false;
+        for (const q of queryWords) {
+          if (w.includes(q) || q.includes(w)) { matchesQuery = true; break; }
         }
+        if (matchesQuery) continue;
+        // Skip size tokens and short words
+        if (/^\d/.test(w) || w.length <= 2) continue;
+        if (KNOWN_FOODS.has(w)) return false;
       }
     }
     return true;

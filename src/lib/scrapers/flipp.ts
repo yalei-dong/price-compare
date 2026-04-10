@@ -326,7 +326,8 @@ const KNOWN_FOODS = new Set([
   "sauce", "soup", "stew", "broth", "stock", "paste", "salsa", "ketchup",
   "mustard", "mayo", "mayonnaise", "vinegar", "oil", "dressing", "marinade",
   "syrup", "honey", "jelly", "jam", "spread", "hummus", "dip", "chutney",
-  "relish", "gravy", "pesto",
+  "relish", "gravy", "pesto", "vinaigrette", "aioli", "glaze", "reduction",
+  "marmalade", "preserve", "preserves", "compote", "coulis",
   // Prepared & Frozen
   "pizza", "burger", "burgers", "nuggets", "meatball", "meatballs",
   "fries", "dumpling", "dumplings", "pie", "taco", "tacos", "wrap", "wraps",
@@ -334,9 +335,12 @@ const KNOWN_FOODS = new Set([
   // Beverages
   "water", "juice", "coffee", "tea", "beer", "wine", "soda", "pop",
   "cola", "cider", "lemonade", "smoothie", "kombucha",
+  "cocktail", "spritzer", "punch", "sangria", "liqueur",
   // Snacks & Sweets
   "chocolate", "candy", "cookie", "cookies", "cake", "brownie", "brownies",
   "pudding", "wafer", "cone", "bar", "gum",
+  "sorbet", "gelato", "sherbet", "popsicle", "ice",
+  "gummy", "gummies", "treat", "treats", "snack", "snacks",
   // Baking & Staples
   "sugar", "salt", "pepper", "cinnamon", "cumin", "turmeric", "paprika",
   "nutmeg", "vanilla", "cocoa", "baking", "yeast", "cornstarch",
@@ -361,16 +365,20 @@ function filterRelevant(results: ScrapedPrice[], query: string): ScrapedPrice[] 
   });
 
   if (queryWords.length <= 1) {
-    // For single-word food queries, reject food+food combinations
+    // For single-word food queries, reject any product that contains
+    // ANOTHER known food/product-type word — the query food is just a
+    // flavor/modifier in those products (e.g. "raspberry vinaigrette").
     if (queryWords.length === 1 && KNOWN_FOODS.has(queryWords[0])) {
       const qw = queryWords[0];
       results = results.filter((r) => {
         const nameWords = (r.productName || "").toLowerCase().split(/[\s,/&+]+/).filter(Boolean);
-        for (let i = 0; i < nameWords.length; i++) {
-          if (nameWords[i] === qw || nameWords[i].includes(qw)) {
-            if (i < nameWords.length - 1 && KNOWN_FOODS.has(nameWords[i + 1])) return false;
-            if (i > 0 && KNOWN_FOODS.has(nameWords[i - 1])) return false;
-          }
+        for (const w of nameWords) {
+          // Skip the query word itself (incl. plurals like "raspberries")
+          if (w === qw || w.includes(qw) || qw.includes(w)) continue;
+          // Skip size tokens like "170g", "6oz", "1L"
+          if (/^\d/.test(w) || w.length <= 2) continue;
+          // If another food/product word appears, this is a combination
+          if (KNOWN_FOODS.has(w)) return false;
         }
         return true;
       });
