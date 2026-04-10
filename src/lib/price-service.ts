@@ -543,20 +543,72 @@ async function fetchPricesFromFreeProviders(
 // Global relevance filter — applied to ALL results (scrapers + free + SerpAPI)
 // ---------------------------------------------------------------------------
 
-/** Food-category words used to detect misleading compound nouns */
-const FOOD_CAT = new Set([
-  "chocolate", "cheese", "cake", "bread", "juice", "sauce", "butter",
-  "cream", "wine", "beer", "coffee", "tea", "jam", "candy", "cookie",
-  "cracker", "chip", "bar", "powder", "cereal", "soup", "steak",
-  "sausage", "burger", "pie", "pudding", "yogurt", "vinegar", "oil",
-  "milk", "water", "flour", "sugar", "salt", "pepper", "rice", "pasta",
-  "cup", "cups", "bunny", "egg", "eggs", "cone", "wafer", "spread",
-  "paste", "ketchup", "puree", "salsa", "stew", "bisque", "chutney",
-  "shrimp", "chicken", "fish", "salmon", "tuna", "cod", "tilapia",
-  "pork", "beef", "lamb", "turkey", "wings", "nuggets", "meatball",
-  "pizza", "noodle", "noodles", "fries", "dumpling", "dumplings",
-  "dip", "hummus", "mayo", "mustard", "dressing", "marinade",
-  "seasoning", "rub", "mix", "syrup", "honey", "jelly",
+/** Comprehensive set of food/grocery words. When a single-word search IS one
+ *  of these, we reject products that combine it with another food word —
+ *  e.g. "garlic" search rejects "garlic shrimp", "garlic bread", etc.       */
+const KNOWN_FOODS = new Set([
+  // Produce
+  "apple", "apples", "banana", "bananas", "orange", "oranges", "lemon", "lemons",
+  "lime", "limes", "grape", "grapes", "pear", "pears", "peach", "peaches",
+  "plum", "plums", "mango", "mangoes", "mangos", "pineapple", "watermelon",
+  "melon", "cantaloupe", "strawberry", "strawberries", "blueberry", "blueberries",
+  "raspberry", "raspberries", "blackberry", "blackberries", "cherry", "cherries",
+  "avocado", "avocados", "tomato", "tomatoes", "potato", "potatoes", "onion", "onions",
+  "garlic", "ginger", "carrot", "carrots", "celery", "broccoli", "cauliflower",
+  "spinach", "kale", "lettuce", "cabbage", "cucumber", "cucumbers", "zucchini",
+  "squash", "pumpkin", "corn", "peas", "beans", "lentils", "mushroom", "mushrooms",
+  "peppers", "jalapeño", "habanero", "beet", "beets", "radish", "turnip",
+  "yam", "yams", "asparagus", "artichoke", "eggplant", "okra", "leek", "leeks",
+  "scallion", "shallot", "parsley", "cilantro", "basil", "mint", "dill", "thyme",
+  "rosemary", "oregano", "sage", "chive", "chives", "coconut",
+
+  // Proteins
+  "chicken", "beef", "pork", "lamb", "turkey", "veal", "bison", "duck",
+  "shrimp", "prawn", "prawns", "salmon", "tuna", "cod", "tilapia", "trout",
+  "halibut", "sardine", "sardines", "crab", "lobster", "clam", "clams",
+  "mussel", "mussels", "oyster", "oysters", "scallop", "scallops",
+  "fish", "steak", "roast", "chop", "chops", "ribs", "wings", "thigh", "thighs",
+  "breast", "drumstick", "bacon", "ham", "sausage", "salami", "pepperoni",
+  "tofu", "tempeh", "seitan",
+
+  // Dairy & Eggs
+  "milk", "cream", "cheese", "butter", "yogurt", "yoghurt", "egg", "eggs",
+  "mozzarella", "cheddar", "parmesan", "brie", "gouda", "feta",
+
+  // Grains & Baked
+  "bread", "rice", "pasta", "noodle", "noodles", "flour", "oat", "oats",
+  "cereal", "granola", "quinoa", "couscous", "barley", "tortilla", "tortillas",
+  "bagel", "bagels", "muffin", "muffins", "croissant", "baguette", "pita",
+  "cracker", "crackers", "chip", "chips", "pretzel", "pretzels",
+
+  // Pantry & Condiments
+  "sauce", "soup", "stew", "broth", "stock", "paste", "salsa", "ketchup",
+  "mustard", "mayo", "mayonnaise", "vinegar", "oil", "dressing", "marinade",
+  "syrup", "honey", "jelly", "jam", "spread", "hummus", "dip", "chutney",
+  "relish", "gravy", "pesto",
+
+  // Prepared & Frozen
+  "pizza", "burger", "burgers", "nuggets", "meatball", "meatballs",
+  "fries", "dumpling", "dumplings", "pie", "taco", "tacos", "wrap", "wraps",
+  "lasagna", "casserole", "curry", "chili", "ramen",
+
+  // Beverages
+  "water", "juice", "coffee", "tea", "beer", "wine", "soda", "pop",
+  "cola", "cider", "lemonade", "smoothie", "kombucha",
+
+  // Snacks & Sweets
+  "chocolate", "candy", "cookie", "cookies", "cake", "brownie", "brownies",
+  "pudding", "ice cream", "wafer", "cone", "bar", "gum",
+
+  // Baking & Staples
+  "sugar", "salt", "pepper", "cinnamon", "cumin", "turmeric", "paprika",
+  "nutmeg", "vanilla", "cocoa", "baking", "yeast", "cornstarch",
+  "powder", "seasoning", "rub", "mix",
+
+  // Nuts & Seeds
+  "peanut", "peanuts", "almond", "almonds", "walnut", "walnuts",
+  "cashew", "cashews", "pistachio", "pistachios", "pecan", "pecans",
+  "hazelnut", "hazelnuts", "sunflower", "sesame", "chia", "flax",
 ]);
 
 /** Non-food product keywords — items containing these are clearly not groceries. */
@@ -634,18 +686,30 @@ function filterMisleadingResults(results: PriceEntry[], query: string): PriceEnt
     // Product name must contain every query word
     if (!queryWords.every((w) => name.includes(w))) return false;
 
-    const nameWords = name.split(/[\s,/]+/).filter(Boolean);
+    const nameWords = name.split(/[\s,/&+]+/).filter(Boolean);
 
-    // For every query word, check if the product name uses it as a modifier
-    // for a different food category word not in the query.
-    // e.g. query "tomato" → reject "tomato sauce", "tomato soup"
-    // e.g. query "peanut butter" → reject "peanut butter chocolate" but keep "peanut butter"
+    // When a query word is a known food, reject products that combine it
+    // with ANOTHER known food word — in either direction.
+    // e.g. "garlic" → reject "garlic shrimp", "garlic bread", "garlic chicken"
+    //      "tomato" → reject "tomato sauce", "tomato soup"
+    //      "peanut butter" → reject "peanut butter chocolate" (but keep "peanut butter")
     for (const qw of queryWords) {
-      for (let i = 0; i < nameWords.length - 1; i++) {
+      if (!KNOWN_FOODS.has(qw)) continue; // only apply to food queries
+      for (let i = 0; i < nameWords.length; i++) {
         if (nameWords[i] === qw || nameWords[i].includes(qw)) {
-          const nextWord = nameWords[i + 1];
-          if (FOOD_CAT.has(nextWord) && !querySet.has(nextWord)) {
-            return false;
+          // Check word AFTER the query word
+          if (i < nameWords.length - 1) {
+            const nextWord = nameWords[i + 1];
+            if (KNOWN_FOODS.has(nextWord) && !querySet.has(nextWord)) {
+              return false;
+            }
+          }
+          // Check word BEFORE the query word
+          if (i > 0) {
+            const prevWord = nameWords[i - 1];
+            if (KNOWN_FOODS.has(prevWord) && !querySet.has(prevWord)) {
+              return false;
+            }
           }
         }
       }

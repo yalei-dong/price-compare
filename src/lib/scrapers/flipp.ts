@@ -289,19 +289,62 @@ const MIN_UNIQUE_STORES = 3;
  * For multi-word queries, all query words must appear in the product name
  * (prevents "organic milk" matching "coconut milk" or "organic chocolate").
  */
-// Common food category words — used to detect misleading compound nouns.
-// e.g. "milk chocolate" is chocolate (not milk), "cream cheese" is cheese (not cream).
-const FOOD_CATEGORY_WORDS = new Set([
-  "chocolate", "cheese", "cake", "bread", "juice", "sauce", "butter",
-  "cream", "wine", "beer", "coffee", "tea", "jam", "candy", "cookie",
-  "cracker", "chip", "bar", "powder", "cereal", "soup", "steak",
-  "sausage", "burger", "pie", "pudding", "yogurt", "vinegar", "oil",
-  "milk", "water", "flour", "sugar", "salt", "pepper", "rice", "pasta",
-  "shrimp", "chicken", "fish", "salmon", "tuna", "cod", "tilapia",
-  "pork", "beef", "lamb", "turkey", "wings", "nuggets", "meatball",
-  "pizza", "noodle", "noodles", "fries", "dumpling", "dumplings",
-  "dip", "hummus", "mayo", "mustard", "dressing", "marinade",
-  "seasoning", "rub", "mix", "syrup", "honey", "jelly",
+// Comprehensive set of food/grocery words. When a single-word search IS one
+// of these, we reject products that combine it with another food word.
+const KNOWN_FOODS = new Set([
+  // Produce
+  "apple", "apples", "banana", "bananas", "orange", "oranges", "lemon", "lemons",
+  "lime", "limes", "grape", "grapes", "pear", "pears", "peach", "peaches",
+  "plum", "plums", "mango", "mangoes", "mangos", "pineapple", "watermelon",
+  "melon", "cantaloupe", "strawberry", "strawberries", "blueberry", "blueberries",
+  "raspberry", "raspberries", "blackberry", "blackberries", "cherry", "cherries",
+  "avocado", "avocados", "tomato", "tomatoes", "potato", "potatoes", "onion", "onions",
+  "garlic", "ginger", "carrot", "carrots", "celery", "broccoli", "cauliflower",
+  "spinach", "kale", "lettuce", "cabbage", "cucumber", "cucumbers", "zucchini",
+  "squash", "pumpkin", "corn", "peas", "beans", "lentils", "mushroom", "mushrooms",
+  "peppers", "jalapeño", "habanero", "beet", "beets", "radish", "turnip",
+  "yam", "yams", "asparagus", "artichoke", "eggplant", "okra", "leek", "leeks",
+  "scallion", "shallot", "parsley", "cilantro", "basil", "mint", "dill", "thyme",
+  "rosemary", "oregano", "sage", "chive", "chives", "coconut",
+  // Proteins
+  "chicken", "beef", "pork", "lamb", "turkey", "veal", "bison", "duck",
+  "shrimp", "prawn", "prawns", "salmon", "tuna", "cod", "tilapia", "trout",
+  "halibut", "sardine", "sardines", "crab", "lobster", "clam", "clams",
+  "mussel", "mussels", "oyster", "oysters", "scallop", "scallops",
+  "fish", "steak", "roast", "chop", "chops", "ribs", "wings", "thigh", "thighs",
+  "breast", "drumstick", "bacon", "ham", "sausage", "salami", "pepperoni",
+  "tofu", "tempeh", "seitan",
+  // Dairy & Eggs
+  "milk", "cream", "cheese", "butter", "yogurt", "yoghurt", "egg", "eggs",
+  "mozzarella", "cheddar", "parmesan", "brie", "gouda", "feta",
+  // Grains & Baked
+  "bread", "rice", "pasta", "noodle", "noodles", "flour", "oat", "oats",
+  "cereal", "granola", "quinoa", "couscous", "barley", "tortilla", "tortillas",
+  "bagel", "bagels", "muffin", "muffins", "croissant", "baguette", "pita",
+  "cracker", "crackers", "chip", "chips", "pretzel", "pretzels",
+  // Pantry & Condiments
+  "sauce", "soup", "stew", "broth", "stock", "paste", "salsa", "ketchup",
+  "mustard", "mayo", "mayonnaise", "vinegar", "oil", "dressing", "marinade",
+  "syrup", "honey", "jelly", "jam", "spread", "hummus", "dip", "chutney",
+  "relish", "gravy", "pesto",
+  // Prepared & Frozen
+  "pizza", "burger", "burgers", "nuggets", "meatball", "meatballs",
+  "fries", "dumpling", "dumplings", "pie", "taco", "tacos", "wrap", "wraps",
+  "lasagna", "casserole", "curry", "chili", "ramen",
+  // Beverages
+  "water", "juice", "coffee", "tea", "beer", "wine", "soda", "pop",
+  "cola", "cider", "lemonade", "smoothie", "kombucha",
+  // Snacks & Sweets
+  "chocolate", "candy", "cookie", "cookies", "cake", "brownie", "brownies",
+  "pudding", "wafer", "cone", "bar", "gum",
+  // Baking & Staples
+  "sugar", "salt", "pepper", "cinnamon", "cumin", "turmeric", "paprika",
+  "nutmeg", "vanilla", "cocoa", "baking", "yeast", "cornstarch",
+  "powder", "seasoning", "rub", "mix",
+  // Nuts & Seeds
+  "peanut", "peanuts", "almond", "almonds", "walnut", "walnuts",
+  "cashew", "cashews", "pistachio", "pistachios", "pecan", "pecans",
+  "hazelnut", "hazelnuts", "sunflower", "sesame", "chia", "flax",
 ]);
 
 function filterRelevant(results: ScrapedPrice[], query: string): ScrapedPrice[] {
@@ -317,7 +360,23 @@ function filterRelevant(results: ScrapedPrice[], query: string): ScrapedPrice[] 
     return queryWords.every((word) => name.includes(word));
   });
 
-  if (queryWords.length <= 1) return results;
+  if (queryWords.length <= 1) {
+    // For single-word food queries, reject food+food combinations
+    if (queryWords.length === 1 && KNOWN_FOODS.has(queryWords[0])) {
+      const qw = queryWords[0];
+      results = results.filter((r) => {
+        const nameWords = (r.productName || "").toLowerCase().split(/[\s,/&+]+/).filter(Boolean);
+        for (let i = 0; i < nameWords.length; i++) {
+          if (nameWords[i] === qw || nameWords[i].includes(qw)) {
+            if (i < nameWords.length - 1 && KNOWN_FOODS.has(nameWords[i + 1])) return false;
+            if (i > 0 && KNOWN_FOODS.has(nameWords[i - 1])) return false;
+          }
+        }
+        return true;
+      });
+    }
+    return results;
+  }
 
   const querySet = new Set(queryWords);
 
@@ -327,15 +386,15 @@ function filterRelevant(results: ScrapedPrice[], query: string): ScrapedPrice[] 
     if (!queryWords.every((word) => name.includes(word))) return false;
 
     // Detect misleading compounds: if the last query word (the head noun,
-    // e.g. "milk") is followed by another food-category word NOT in the query
+    // e.g. "milk") is followed by another food word NOT in the query
     // (e.g. "chocolate"), the product is something else (milk chocolate ≠ milk).
     const headNoun = queryWords[queryWords.length - 1];
-    const nameWords = name.split(/[\s,/]+/);
+    const nameWords = name.split(/[\s,/&+]+/);
     for (let i = 0; i < nameWords.length - 1; i++) {
       if (nameWords[i] === headNoun || nameWords[i].includes(headNoun)) {
         const nextWord = nameWords[i + 1];
-        if (FOOD_CATEGORY_WORDS.has(nextWord) && !querySet.has(nextWord)) {
-          return false; // "milk chocolate", "cream cheese" etc.
+        if (KNOWN_FOODS.has(nextWord) && !querySet.has(nextWord)) {
+          return false;
         }
       }
     }
