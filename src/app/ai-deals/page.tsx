@@ -191,6 +191,30 @@ export default function AIDealsPage() {
               </ul>
             </div>
 
+            {/* Shopping list deals card */}
+            {shoppingListItems.length > 0 && (
+              <button
+                onClick={() =>
+                  sendMessage(
+                    `Find the best deals for my shopping list: ${shoppingListItems.map((i) => i.productName).join(", ")}. Which store saves me the most and give me directions.`
+                  )
+                }
+                className="w-full max-w-lg mb-4 px-4 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl text-left hover:border-green-400 hover:shadow-md transition-all shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">🛒</span>
+                  <div>
+                    <p className="font-semibold text-green-800 text-sm">Best deals for my shopping list</p>
+                    <p className="text-xs text-green-600 mt-0.5">
+                      {shoppingListItems.length} item{shoppingListItems.length !== 1 ? "s" : ""}: {shoppingListItems.map((i) => i.productName).slice(0, 4).join(", ")}
+                      {shoppingListItems.length > 4 ? ` +${shoppingListItems.length - 4} more` : ""}
+                    </p>
+                  </div>
+                  <span className="ml-auto text-green-500 text-xl">→</span>
+                </div>
+              </button>
+            )}
+
             {/* Suggestion chips */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
               {SUGGESTIONS.map((s, i) => (
