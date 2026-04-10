@@ -638,6 +638,17 @@ const NON_FOOD_KEYWORDS = [
   "bicycle", "bike", "treadmill", "elliptical", "dumbbell",
   "kayak", "tent", "sleeping bag",
   "titanium case", "trail loop",
+  // Bath / Body / Personal care / Household
+  "epsom", "scented", "bath bomb", "bubble bath", "body wash", "body lotion",
+  "shampoo", "conditioner", "hair dye", "hair color", "hair colour",
+  "lotion", "moisturizer", "sunscreen", "deodorant", "antiperspirant",
+  "soap", "hand soap", "dish soap", "detergent", "fabric softener",
+  "bleach", "disinfectant", "lysol", "windex", "swiffer",
+  "diaper", "diapers", "wipes", "toilet paper", "paper towel",
+  "toothbrush", "mouthwash", "floss", "razor", "shaving",
+  "candle", "air freshener", "incense", "diffuser",
+  "bandage", "bandaid", "thermometer", "heating pad",
+  "cat litter", "dog food", "cat food", "pet food", "kibble",
 ];
 
 function isNonFoodItem(name: string): boolean {
