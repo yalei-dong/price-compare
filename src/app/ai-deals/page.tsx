@@ -196,7 +196,7 @@ export default function AIDealsPage() {
               <button
                 onClick={() =>
                   sendMessage(
-                    `Find the best deals for my shopping list: ${shoppingListItems.map((i) => i.productName).join(", ")}. Which store saves me the most and give me directions.`
+                    `For my shopping list (${shoppingListItems.map((i) => i.productName).join(", ")}), show only the cheapest store and price for each item, the total cost, total savings, and directions to the best store.`
                   )
                 }
                 className="w-full max-w-lg mb-4 px-4 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl text-left hover:border-green-400 hover:shadow-md transition-all shadow-sm"
@@ -303,8 +303,55 @@ function MarkdownContent({ content }: { content: string }) {
   const lines = content.split("\n");
   const elements: React.ReactNode[] = [];
 
-  for (let i = 0; i < lines.length; i++) {
+  let i = 0;
+  while (i < lines.length) {
     const line = lines[i];
+
+    // Table detection: line with pipes
+    if (line.includes("|") && line.trim().startsWith("|")) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].includes("|") && lines[i].trim().startsWith("|")) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      // Parse table
+      const rows = tableLines
+        .filter((l) => !l.match(/^\|[\s:-]+\|/)) // skip separator rows
+        .map((l) =>
+          l.split("|").filter((_, idx, arr) => idx > 0 && idx < arr.length - 1).map((c) => c.trim())
+        );
+      if (rows.length > 0) {
+        const headerRow = rows[0];
+        const dataRows = rows.slice(1);
+        elements.push(
+          <div key={`table-${i}`} className="overflow-x-auto my-2">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  {headerRow.map((cell, ci) => (
+                    <th key={ci} className="px-3 py-1.5 text-left font-semibold text-gray-700 border-b border-gray-200">
+                      {renderInline(cell)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dataRows.map((row, ri) => (
+                  <tr key={ri} className={ri % 2 === 0 ? "bg-white" : "bg-gray-50/50"}>
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="px-3 py-1.5 border-b border-gray-100">
+                        {renderInline(cell)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      continue;
+    }
 
     // Headers
     if (line.startsWith("### ")) {
@@ -363,6 +410,7 @@ function MarkdownContent({ content }: { content: string }) {
         </p>
       );
     }
+    i++;
   }
 
   return <>{elements}</>;
