@@ -16,18 +16,15 @@ interface ShoppingListContextType {
 const ShoppingListContext = createContext<ShoppingListContextType | undefined>(undefined);
 
 export function ShoppingListProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<ShoppingListItem[]>([]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("price-compare-shopping-list");
-    if (saved) {
-      try {
-        setItems(JSON.parse(saved));
-      } catch {
-        // ignore corrupt data
-      }
+  const [items, setItems] = useState<ShoppingListItem[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem("price-compare-shopping-list");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
-  }, []);
+  });
 
   useEffect(() => {
     localStorage.setItem("price-compare-shopping-list", JSON.stringify(items));
