@@ -318,30 +318,32 @@ export default function AIDealsPage() {
 
 /** Rejoin markdown links that got split across multiple lines by the AI */
 function fixBrokenLinks(text: string): string {
-  // Find every "[...](..." pattern and collapse any whitespace/newlines until the closing ")"
+  // First: fix bold-wrapped links like **[text]**(url) or **[text]** (url) → [text](url)
+  let cleaned = text.replace(/\*\*\[([^\]]+)\]\*\*\s*\(?/g, (_, linkText) => `[${linkText}](`);
+  // Also fix [**text**](url) → [text](url)
+  cleaned = cleaned.replace(/\[\*\*([^\]]+)\*\*\]/g, "[$1]");
+
+  // Then: collapse any whitespace/newlines inside [text](url) patterns
   let result = "";
   let i = 0;
-  while (i < text.length) {
-    // Look for start of a markdown link: [
-    if (text[i] === "[") {
-      // Find the matching ]
-      const closeBracket = text.indexOf("]", i + 1);
+  while (i < cleaned.length) {
+    if (cleaned[i] === "[") {
+      const closeBracket = cleaned.indexOf("]", i + 1);
       if (closeBracket !== -1) {
-        // Check if followed by ( (possibly with whitespace/newlines)
         let afterBracket = closeBracket + 1;
-        while (afterBracket < text.length && /[\s\n\r]/.test(text[afterBracket])) afterBracket++;
-        if (afterBracket < text.length && text[afterBracket] === "(") {
-          // Find the closing ) — skip whitespace/newlines inside
+        // Skip whitespace, newlines, and stray ** between ] and (
+        while (afterBracket < cleaned.length && /[\s\n\r*]/.test(cleaned[afterBracket])) afterBracket++;
+        if (afterBracket < cleaned.length && cleaned[afterBracket] === "(") {
           let depth = 1;
           let urlEnd = afterBracket + 1;
-          while (urlEnd < text.length && depth > 0) {
-            if (text[urlEnd] === "(") depth++;
-            else if (text[urlEnd] === ")") depth--;
+          while (urlEnd < cleaned.length && depth > 0) {
+            if (cleaned[urlEnd] === "(") depth++;
+            else if (cleaned[urlEnd] === ")") depth--;
             if (depth > 0) urlEnd++;
           }
           if (depth === 0) {
-            const linkText = text.slice(i + 1, closeBracket);
-            const url = text.slice(afterBracket + 1, urlEnd).replace(/[\s\n\r]+/g, "");
+            const linkText = cleaned.slice(i + 1, closeBracket);
+            const url = cleaned.slice(afterBracket + 1, urlEnd).replace(/[\s\n\r]+/g, "");
             result += `[${linkText}](${url})`;
             i = urlEnd + 1;
             continue;
@@ -349,7 +351,7 @@ function fixBrokenLinks(text: string): string {
         }
       }
     }
-    result += text[i];
+    result += cleaned[i];
     i++;
   }
   return result;
