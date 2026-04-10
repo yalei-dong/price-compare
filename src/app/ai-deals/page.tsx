@@ -191,28 +191,48 @@ export default function AIDealsPage() {
               </ul>
             </div>
 
-            {/* Shopping list deals card */}
+            {/* Shopping list deals cards */}
             {shoppingListItems.length > 0 && (
-              <button
-                onClick={() =>
-                  sendMessage(
-                    `For my shopping list (${shoppingListItems.map((i) => i.productName).join(", ")}), show only the cheapest store and price for each item, the total cost, total savings, and directions to the best store.`
-                  )
-                }
-                className="w-full max-w-lg mb-4 px-4 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl text-left hover:border-green-400 hover:shadow-md transition-all shadow-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">🛒</span>
-                  <div>
-                    <p className="font-semibold text-green-800 text-sm">Best deals for my shopping list</p>
-                    <p className="text-xs text-green-600 mt-0.5">
-                      {shoppingListItems.length} item{shoppingListItems.length !== 1 ? "s" : ""}: {shoppingListItems.map((i) => i.productName).slice(0, 4).join(", ")}
-                      {shoppingListItems.length > 4 ? ` +${shoppingListItems.length - 4} more` : ""}
-                    </p>
+              <div className="w-full max-w-lg mb-4 space-y-2">
+                <button
+                  onClick={() =>
+                    sendMessage(
+                      `For my shopping list (${shoppingListItems.map((i) => i.productName).join(", ")}), find the ONE store where I can buy everything for the lowest total cost. Show a table with the item, price at that store, and the total. Compare to the cheapest multi-store total. Include directions.`
+                    )
+                  }
+                  className="w-full px-4 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl text-left hover:border-green-400 hover:shadow-md transition-all shadow-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">🏪</span>
+                    <div>
+                      <p className="font-semibold text-green-800 text-sm">Best ONE store for my list</p>
+                      <p className="text-xs text-green-600 mt-0.5">
+                        {shoppingListItems.length} item{shoppingListItems.length !== 1 ? "s" : ""} — cheapest single trip
+                      </p>
+                    </div>
+                    <span className="ml-auto text-green-500 text-xl">→</span>
                   </div>
-                  <span className="ml-auto text-green-500 text-xl">→</span>
-                </div>
-              </button>
+                </button>
+                <button
+                  onClick={() =>
+                    sendMessage(
+                      `For my shopping list (${shoppingListItems.map((i) => i.productName).join(", ")}), show only the cheapest store and price for each item, the total cost, total savings, and directions.`
+                    )
+                  }
+                  className="w-full px-4 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl text-left hover:border-blue-400 hover:shadow-md transition-all shadow-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">💰</span>
+                    <div>
+                      <p className="font-semibold text-blue-800 text-sm">Cheapest across all stores</p>
+                      <p className="text-xs text-blue-600 mt-0.5">
+                        {shoppingListItems.length} item{shoppingListItems.length !== 1 ? "s" : ""} — max savings, multiple stores
+                      </p>
+                    </div>
+                    <span className="ml-auto text-blue-500 text-xl">→</span>
+                  </div>
+                </button>
+              </div>
             )}
 
             {/* Suggestion chips */}
