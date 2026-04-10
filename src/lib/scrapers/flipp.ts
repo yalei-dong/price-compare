@@ -341,6 +341,11 @@ const KNOWN_FOODS = new Set([
   "pudding", "wafer", "cone", "bar", "gum",
   "sorbet", "gelato", "sherbet", "popsicle", "ice",
   "gummy", "gummies", "treat", "treats", "snack", "snacks",
+  "biscotti", "biscuit", "biscuits", "bite", "bites", "cluster", "clusters",
+  "crisp", "crisps", "roll", "rolls", "strip", "strips", "square", "squares",
+  "loaf", "scone", "scones", "tart", "tarts", "turnover", "turnovers",
+  "pancake", "pancakes", "waffle", "waffles", "crepe", "crepes",
+  "oatmeal", "porridge", "trail", "popcorn",
   // Baking & Staples
   "sugar", "salt", "pepper", "cinnamon", "cumin", "turmeric", "paprika",
   "nutmeg", "vanilla", "cocoa", "baking", "yeast", "cornstarch",
