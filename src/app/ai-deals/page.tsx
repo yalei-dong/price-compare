@@ -300,7 +300,13 @@ export default function AIDealsPage() {
 function MarkdownContent({ content }: { content: string }) {
   if (!content) return null;
 
-  const lines = content.split("\n");
+  // Rejoin markdown links that got split across lines
+  const fixed = content.replace(/\[([^\]]+)\]\(\s*\n\s*/g, "[$1](")
+    .replace(/\]\(\s*(https?:\/\/[^\s)]*)\s*\n\s*([^\s)]*\))/g, "]($1$2");
+  // Also collapse any remaining line breaks inside parentheses of links
+  const rejoined = fixed.replace(/(\[[^\]]+\]\([^\s)]*)\n\s*([^\s)]*\))/g, "$1$2");
+
+  const lines = rejoined.split("\n");
   const elements: React.ReactNode[] = [];
 
   let i = 0;
