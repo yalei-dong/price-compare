@@ -691,10 +691,14 @@ function pickBestThumbnail(prices: PriceEntry[], query: string): string {
 }
 
 function filterMisleadingResults(results: PriceEntry[], query: string): PriceEntry[] {
-  // Always filter out non-food products (electronics, appliances, etc.)
-  results = results.filter((r) => !isNonFoodItem(r.productName || ""));
-
   const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
+  const isQueryFood = queryWords.some((w) => KNOWN_FOODS.has(w));
+
+  // Only filter out non-food products when searching for food
+  if (isQueryFood) {
+    results = results.filter((r) => !isNonFoodItem(r.productName || ""));
+  }
+
   if (queryWords.length === 0) return results;
 
   const querySet = new Set(queryWords);

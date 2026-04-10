@@ -256,8 +256,8 @@ async function flippSearch(
     // Skip non-food stores
     if (NON_FOOD_STORES.has(store.toLowerCase().trim())) continue;
 
-    // Skip non-food products (electronics, appliances, clothing, etc.)
-    if (isNonFoodProduct(productName)) continue;
+    // Note: non-food product filtering is done in filterRelevant()
+    // based on whether the query is a food term
 
     const imageUrl = item.clean_image_url || item.clipping_image_url || item.cutout_image_url || item.image_url || undefined;
     const unit = parseUnit(item);
@@ -369,9 +369,12 @@ const KNOWN_FOODS = new Set([
 
 function filterRelevant(results: ScrapedPrice[], query: string): ScrapedPrice[] {
   const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
+  const isQueryFood = queryWords.some((w) => KNOWN_FOODS.has(w));
 
-  // Always filter out non-food products regardless of query length
-  results = results.filter((r) => !isNonFoodProduct(r.productName || ""));
+  // Only filter out non-food products when searching for food
+  if (isQueryFood) {
+    results = results.filter((r) => !isNonFoodProduct(r.productName || ""));
+  }
 
   // For ALL queries (including single-word), the product name must contain
   // every query word. Flipp often returns unrelated items (e.g. crackers for "pear").
