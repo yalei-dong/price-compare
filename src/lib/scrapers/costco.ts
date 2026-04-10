@@ -363,7 +363,7 @@ async function fetchCollectionProducts(
 }
 
 // ---- Convert Instacart items to ScrapedPrice ----
-function toScrapedPrice(item: InstacartItem): ScrapedPrice | null {
+function toScrapedPrice(item: InstacartItem, query: string): ScrapedPrice | null {
   const name = item.name;
   if (!name) return null;
 
@@ -376,6 +376,16 @@ function toScrapedPrice(item: InstacartItem): ScrapedPrice | null {
   const unit = item.price?.viewSection?.itemCard?.pricingUnitString || item.size || "each";
   const imageUrl = item.viewSection?.itemImage?.url || undefined;
 
+  // Build in-app flyer detail page URL (same as Flipp items)
+  const flyerParams = new URLSearchParams();
+  flyerParams.set("store", "Costco");
+  flyerParams.set("product", name);
+  flyerParams.set("price", price.toString());
+  flyerParams.set("currency", "CAD");
+  if (imageUrl) flyerParams.set("image", imageUrl);
+  if (unit) flyerParams.set("unit", unit);
+  flyerParams.set("q", query);
+
   return {
     storeName: "Costco",
     price,
@@ -383,7 +393,7 @@ function toScrapedPrice(item: InstacartItem): ScrapedPrice | null {
     productName: name,
     unit,
     imageUrl,
-    productUrl: `https://sameday.costco.ca/store/costco-canada/search/${encodeURIComponent(name)}`,
+    productUrl: `/flyer-item?${flyerParams.toString()}`,
   };
 }
 
@@ -444,7 +454,7 @@ async function searchCostcoViaInstacart(
         if (!re.test(itemName)) continue;
       }
 
-      const sp = toScrapedPrice(item);
+      const sp = toScrapedPrice(item, query);
       if (!sp) continue;
 
       const key = `${sp.productName}-${sp.price}`;
@@ -508,6 +518,23 @@ async function searchCostcoViaFlipp(
         else if (text.includes("/100g")) unit = "per 100g";
         else if (text.includes("/l")) unit = "per L";
 
+        const flyerParams = new URLSearchParams();
+        flyerParams.set("store", "Costco");
+        flyerParams.set("product", name);
+        flyerParams.set("price", price.toString());
+        flyerParams.set("currency", "CAD");
+        if (item.clean_image_url || item.clipping_image_url || item.cutout_image_url || item.image_url) {
+          flyerParams.set("image", (item.clean_image_url || item.clipping_image_url || item.cutout_image_url || item.image_url)!);
+        }
+        if (item.valid_from) flyerParams.set("from", item.valid_from);
+        if (item.valid_to) flyerParams.set("to", item.valid_to);
+        if (unit) flyerParams.set("unit", unit);
+        if (item.sale_story) flyerParams.set("sale", item.sale_story);
+        if (item.merchant_logo) flyerParams.set("logo", item.merchant_logo);
+        if (item.flyer_id) flyerParams.set("fid", item.flyer_id.toString());
+        if (item.flyer_item_id) flyerParams.set("iid", item.flyer_item_id.toString());
+        flyerParams.set("q", query);
+
         results.push({
           storeName: "Costco",
           price,
@@ -521,7 +548,7 @@ async function searchCostcoViaFlipp(
             undefined,
           unit,
           validUntil: item.valid_to || undefined,
-          productUrl: `https://www.costco.ca/CatalogSearch?keyword=${encodeURIComponent(name)}`,
+          productUrl: `/flyer-item?${flyerParams.toString()}`,
         });
       }
     } catch {
