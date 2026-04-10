@@ -16,9 +16,35 @@ export default function HomePage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const { addItem } = useShoppingList();
   const locale = useLocale();
   const t = useTranslation();
+
+  const HISTORY_KEY = "price-compare-search-history";
+  const MAX_HISTORY = 12;
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(HISTORY_KEY);
+      if (saved) setSearchHistory(JSON.parse(saved));
+    } catch { /* ignore */ }
+  }, []);
+
+  function saveToHistory(term: string) {
+    const trimmed = term.trim();
+    if (!trimmed) return;
+    setSearchHistory((prev) => {
+      const updated = [trimmed, ...prev.filter((h) => h.toLowerCase() !== trimmed.toLowerCase())].slice(0, MAX_HISTORY);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }
+
+  function clearHistory() {
+    setSearchHistory([]);
+    localStorage.removeItem(HISTORY_KEY);
+  }
 
   useEffect(() => {
     if (!locale.loading) fetchProducts();
@@ -30,6 +56,7 @@ export default function HomePage() {
 
   async function fetchProducts() {
     setLoading(true);
+    if (query.trim()) saveToHistory(query);
     try {
       const params = new URLSearchParams();
       if (query) params.set("q", query);
@@ -100,21 +127,51 @@ export default function HomePage() {
 
       {/* Quick search suggestions when idle */}
       {!searched && !loading && (
-        <div className="mt-2 sm:mt-6">
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-3 text-center">Popular searches</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {["Milk", "Eggs", "Bread", "Chicken", "Rice", "Apples"].map((term) => (
-              <button
-                key={term}
-                onClick={() => {
-                  setQuery(term);
-                  setTimeout(() => fetchProducts(), 100);
-                }}
-                className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-colors shadow-sm"
-              >
-                {term}
-              </button>
-            ))}
+        <div className="mt-2 sm:mt-6 space-y-6">
+          {searchHistory.length > 0 && (
+            <div>
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Recent searches</p>
+                <button
+                  onClick={clearHistory}
+                  className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                  title="Clear history"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex flex-wrap justify-center gap-2">
+                {searchHistory.map((term) => (
+                  <button
+                    key={term}
+                    onClick={() => {
+                      setQuery(term);
+                      setTimeout(() => fetchProducts(), 100);
+                    }}
+                    className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-full text-sm text-blue-700 hover:border-blue-400 hover:bg-blue-100 transition-colors shadow-sm"
+                  >
+                    🕒 {term}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div>
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-3 text-center">Popular searches</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {["Milk", "Eggs", "Bread", "Chicken", "Rice", "Apples"].map((term) => (
+                <button
+                  key={term}
+                  onClick={() => {
+                    setQuery(term);
+                    setTimeout(() => fetchProducts(), 100);
+                  }}
+                  className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-colors shadow-sm"
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
