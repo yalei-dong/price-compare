@@ -418,13 +418,14 @@ function MarkdownContent({ content }: { content: string }) {
 
 /** Render inline markdown (bold, italic, code, links) */
 function renderInline(text: string): React.ReactNode {
-  // Split on [text](url) (handling nested parens in URLs), **bold**, *italic*, and `code`
-  const parts = text.split(/(\[[^\]]+\]\([^)]*(?:\([^)]*\))*[^)]*\)|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+  // Split on [text](url), **bold**, *italic*, and `code`
+  // The link regex captures URLs with ?, &, =, +, and other common URL chars
+  const parts = text.split(/(\[[^\]]+\]\(https?:\/\/[^\s)]+\)|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
 
   return parts.map((part, i) => {
     // Markdown link [text](url)
-    const linkMatch = part.match(/^\[([^\]]+)\]\((.+)\)$/);
-    if (linkMatch && linkMatch[2].startsWith("http")) {
+    const linkMatch = part.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+    if (linkMatch) {
       return (
         <a
           key={i}
