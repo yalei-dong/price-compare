@@ -22,10 +22,22 @@ export default function AIDealsPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [totalSavings, setTotalSavings] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const locale = useLocale();
   const { items: shoppingListItems } = useShoppingList();
+
+  // Parse savings from completed assistant messages
+  useEffect(() => {
+    let sum = 0;
+    for (const msg of messages) {
+      if (msg.role !== "assistant") continue;
+      const match = msg.content.match(/Estimated savings:\s*\$?([\d.]+)/i);
+      if (match) sum += parseFloat(match[1]) || 0;
+    }
+    setTotalSavings(sum);
+  }, [messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -143,6 +155,15 @@ export default function AIDealsPage() {
 
   return (
     <div className="flex flex-col h-[calc(100dvh-64px-72px)] md:h-[calc(100dvh-64px)] max-w-3xl mx-auto">
+      {/* Savings banner */}
+      {totalSavings > 0 && (
+        <div className="bg-green-50 border-b border-green-200 px-4 py-2 flex items-center justify-center gap-2 text-sm">
+          <span className="text-green-700 font-semibold">💰 Total estimated savings this session:</span>
+          <span className="bg-green-600 text-white px-2.5 py-0.5 rounded-full font-bold text-sm">
+            ${totalSavings.toFixed(2)}
+          </span>
+        </div>
+      )}
       {/* Chat messages area */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
         {messages.length === 0 ? (
