@@ -12,6 +12,8 @@ export async function POST(request: NextRequest) {
   const userPrompt: string = body.prompt?.trim();
   const cityOverride: string | undefined = body.city;
   const regionOverride: string | undefined = body.region;
+  const shoppingList: string[] = Array.isArray(body.shoppingList) ? body.shoppingList.slice(0, 20) : [];
+  const searchHistory: string[] = Array.isArray(body.searchHistory) ? body.searchHistory.slice(0, 12) : [];
   if (!userPrompt) {
     return NextResponse.json({ error: "prompt is required" }, { status: 400 });
   }
@@ -40,7 +42,7 @@ export async function POST(request: NextRequest) {
   const priceData = await fetchPriceContext(searchTerms, country, geo);
 
   // Build the system prompt with real price data
-  const systemPrompt = buildSystemPrompt(country, city, priceData);
+  const systemPrompt = buildSystemPrompt(country, city, priceData, shoppingList, searchHistory);
 
   // --- Provider cascade: Gemini → Groq → template fallback ---
   const aiStream = await tryGeminiStream(systemPrompt, userPrompt)
@@ -434,8 +436,16 @@ async function fetchPriceContext(
 }
 
 /** Build the system prompt with price context */
-function buildSystemPrompt(country: string, city: string, priceData: string): string {
+function buildSystemPrompt(country: string, city: string, priceData: string, shoppingList: string[] = [], searchHistory: string[] = []): string {
   const location = city ? `${city}, ${country}` : country;
+
+  let userContext = "";
+  if (shoppingList.length > 0) {
+    userContext += `\n\nUSER'S SHOPPING LIST (items they need to buy):\n${shoppingList.map((item) => `- ${item}`).join("\n")}\n\nWhen relevant, factor in their shopping list to suggest which store would save them the most overall. Proactively mention deals on items from their list.`;
+  }
+  if (searchHistory.length > 0) {
+    userContext += `\n\nUSER'S RECENT SEARCHES (shows their interests):\n${searchHistory.map((term) => `- ${term}`).join("\n")}\n\nUse this to understand what products the user cares about. If they ask a general question, bias your recommendations toward these categories.`;
+  }
 
   return `You are the PriceCompare AI Deals Advisor — a friendly, knowledgeable grocery shopping assistant.
 
@@ -450,6 +460,7 @@ YOUR CAPABILITIES:
 
 CURRENT REAL PRICE DATA:
 ${priceData}
+${userContext}
 
 GUIDELINES:
 - Use the real price data above when answering. Cite specific store names and prices.
@@ -463,5 +474,7 @@ GUIDELINES:
 - Always suggest the cheapest option first, then alternatives.
 - When comparing, show savings (e.g., "Save $2.50 by choosing Store X over Store Y") — but only between comparable products.
 - Mention if a deal is in-store only vs. online.
+- When recommending a specific store, include a Google Maps directions link so the user can navigate there. Format: [🗺️ Get directions to Store Name](https://www.google.com/maps/dir/?api=1&destination=Store+Name+City). Use the user's city in the destination if known.
+- If you recommend one best store for everything, include the route link prominently.
 - Keep responses focused and actionable — this is a shopping assistant, not a chatbot.`;
 }

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useLocale } from "@/context/LocaleContext";
+import { useShoppingList } from "@/context/ShoppingListContext";
 
 interface Message {
   role: "user" | "assistant";
@@ -24,6 +25,7 @@ export default function AIDealsPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const locale = useLocale();
+  const { items: shoppingListItems } = useShoppingList();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -56,6 +58,13 @@ export default function AIDealsPage() {
         body: JSON.stringify({
           prompt: text,
           ...(locale.city && { city: locale.city }),
+          shoppingList: shoppingListItems.map((i) => i.productName),
+          searchHistory: (() => {
+            try {
+              const raw = localStorage.getItem("price-compare-search-history");
+              return raw ? JSON.parse(raw) : [];
+            } catch { return []; }
+          })(),
         }),
       });
 
