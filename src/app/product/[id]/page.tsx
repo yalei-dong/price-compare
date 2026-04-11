@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import PriceTable from "@/components/PriceTable";
+import { FlyerDetailModal, parseFlyerUrl, FlyerModalData } from "@/components/PriceTable";
 import ProductImage from "@/components/ProductImage";
 import PriceHistoryChart from "@/components/PriceHistoryChart";
 import { useShoppingList } from "@/context/ShoppingListContext";
@@ -20,6 +21,7 @@ export default function ProductDetailPage() {
   const [sortBy, setSortBy] = useState<"price" | "store">("price");
   const [filterType, setFilterType] = useState<string>("all");
   const [addedFlash, setAddedFlash] = useState(false);
+  const [flyerModal, setFlyerModal] = useState<FlyerModalData | null>(null);
   const { addItem } = useShoppingList();
   const locale = useLocale();
   const t = useTranslation();
@@ -27,7 +29,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (locale.loading) return;
     const localeParam = locale.countryCode ? `?locale=${locale.countryCode}` : "";
-    fetch(`/api/products/${id}${localeParam}`)
+    fetch(`/api/products/${id}${localeParam}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (data.error) {
@@ -126,11 +128,13 @@ export default function ProductDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {cheapest && (
           cheapest.url ? (
-            <a
-              href={cheapest.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block bg-green-50 border border-green-200 rounded-xl p-4 transition-colors hover:bg-green-100 hover:border-green-400 cursor-pointer group"
+            <button
+              onClick={() => {
+                const flyer = parseFlyerUrl(cheapest.url!);
+                if (flyer) { setFlyerModal(flyer); }
+                else { window.open(cheapest.url, "_blank", "noopener,noreferrer"); }
+              }}
+              className="block w-full text-left bg-green-50 border border-green-200 rounded-xl p-4 transition-colors hover:bg-green-100 hover:border-green-400 cursor-pointer group"
             >
               <div className="text-xs text-green-700 font-medium mb-1">{t("detail.cheapest")}</div>
               <div className="text-2xl font-bold text-green-700">
@@ -141,7 +145,7 @@ export default function ProductDetailPage() {
                 <span>{cheapest.storeLogo} {cheapest.storeName}</span>
                 <span className="text-xs font-medium group-hover:underline">{t("card.visitStore")} ↗</span>
               </div>
-            </a>
+            </button>
           ) : (
             <div className="bg-green-50 border border-green-200 rounded-xl p-4">
               <div className="text-xs text-green-700 font-medium mb-1">{t("detail.cheapest")}</div>
@@ -157,11 +161,13 @@ export default function ProductDetailPage() {
         )}
         {mostExpensive && (
           mostExpensive.url ? (
-            <a
-              href={mostExpensive.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block bg-red-50 border border-red-200 rounded-xl p-4 transition-colors hover:bg-red-100 hover:border-red-400 cursor-pointer group"
+            <button
+              onClick={() => {
+                const flyer = parseFlyerUrl(mostExpensive.url!);
+                if (flyer) { setFlyerModal(flyer); }
+                else { window.open(mostExpensive.url, "_blank", "noopener,noreferrer"); }
+              }}
+              className="block w-full text-left bg-red-50 border border-red-200 rounded-xl p-4 transition-colors hover:bg-red-100 hover:border-red-400 cursor-pointer group"
             >
               <div className="text-xs text-red-700 font-medium mb-1">{t("detail.mostExpensive")}</div>
               <div className="text-2xl font-bold text-red-600">
@@ -172,7 +178,7 @@ export default function ProductDetailPage() {
                 <span>{mostExpensive.storeLogo} {mostExpensive.storeName}</span>
                 <span className="text-xs font-medium group-hover:underline">{t("card.visitStore")} ↗</span>
               </div>
-            </a>
+            </button>
           ) : (
             <div className="bg-red-50 border border-red-200 rounded-xl p-4">
               <div className="text-xs text-red-700 font-medium mb-1">{t("detail.mostExpensive")}</div>
@@ -238,6 +244,8 @@ export default function ProductDetailPage() {
         productName={product.name}
         currentPrices={product.prices}
       />
+
+      {flyerModal && <FlyerDetailModal data={flyerModal} onClose={() => setFlyerModal(null)} />}
     </div>
   );
 }

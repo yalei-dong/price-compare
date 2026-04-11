@@ -5,6 +5,18 @@
 
 import { Scraper, ScrapedPrice } from "./types";
 
+function buildFlyerUrl(store: string, product: string, price: number, currency: string, imageUrl?: string | null, unit?: string, query?: string): string {
+  const p = new URLSearchParams();
+  p.set("store", store);
+  p.set("product", product);
+  p.set("price", price.toString());
+  p.set("currency", currency);
+  if (imageUrl) p.set("image", imageUrl);
+  if (unit) p.set("unit", unit);
+  if (query) p.set("q", query);
+  return `/flyer-item?${p.toString()}`;
+}
+
 interface WalmartSearchItem {
   name?: string;
   description?: string;
@@ -81,11 +93,7 @@ async function scrapeWalmartCA(query: string): Promise<ScrapedPrice[]> {
             price,
             currency: "CAD",
             productName: item.title || item.name || query,
-            productUrl: item.canonicalUrl
-              ? `https://www.walmart.ca${item.canonicalUrl}`
-              : item.link?.url
-                ? `https://www.walmart.ca${item.link.url}`
-                : undefined,
+            productUrl: buildFlyerUrl("Walmart.ca", item.title || item.name || query, price, "CAD", item.imageInfo?.thumbnailUrl || item.image?.url, "each", query),
             imageUrl: item.imageInfo?.thumbnailUrl || item.image?.url || undefined,
             unit: "each",
           });
@@ -159,9 +167,7 @@ async function scrapeWalmartUS(query: string): Promise<ScrapedPrice[]> {
             price,
             currency: "USD",
             productName: item.name || query,
-            productUrl: item.canonicalUrl
-              ? `https://www.walmart.com${item.canonicalUrl}`
-              : undefined,
+            productUrl: buildFlyerUrl("Walmart", item.name || query, price, "USD", item.imageInfo?.thumbnailUrl, "each", query),
             imageUrl: item.imageInfo?.thumbnailUrl || undefined,
             unit: "each",
           });

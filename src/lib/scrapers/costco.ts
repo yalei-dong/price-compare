@@ -18,6 +18,8 @@ const HASHES = {
     "e5231eab24795280ff3e556c24ddfedaed6d9d553a856fa20670428087a21ecb",
   CollectionProductsWithFeaturedProducts:
     "5573f6ef85bfad81463b431985396705328c5ac3283c4e183aa36c6aad1afafe",
+  Search:
+    "539a60b5f92d59095b87f403f26a11187ad33e080c8a6575aeea9c5ad9501a7a",
 };
 
 // Toronto defaults
@@ -76,9 +78,11 @@ async function getGuestToken(): Promise<string | null> {
     );
     if (!res.ok) return null;
     const html = await res.text();
-    const m = html.match(/token%22%3A%22([^%"]+)/);
+    // Match the Instacart client token (v2.<hex>.<base64>) — avoid matching
+    // Mapbox tokens (pk.eyJ…) that also appear in the URL-encoded HTML.
+    const m = html.match(/v2\.[a-f0-9]{10,}\.[A-Za-z0-9_-]+/);
     if (!m) return null;
-    guestToken = m[1];
+    guestToken = m[0];
     tokenExpiresAt = Date.now() + 12 * 60 * 60 * 1000;
     return guestToken;
   } catch {
@@ -187,8 +191,9 @@ const CATEGORY_SYNONYMS: Record<string, string[]> = {
   cereal: ["cereal", "breakfast"],
   pasta: ["pasta", "pantry"],
   rice: ["rice", "grains", "pantry"],
-  oil: ["pantry", "cooking", "condiments"],
-  vinegar: ["pantry", "condiments"],
+  oil: ["pantry", "baking & cooking", "cooking", "condiments", "sauces & condiments"],
+  "olive oil": ["pantry", "baking & cooking", "sauces & condiments"],
+  vinegar: ["pantry", "condiments", "sauces & condiments"],
   flour: ["baking", "pantry"],
   sugar: ["baking", "pantry"],
   honey: ["pantry", "condiments"],
@@ -348,7 +353,7 @@ async function fetchCollectionProducts(
       {
         shopId: DEFAULT_SHOP_ID,
         pageViewId: crypto.randomUUID(),
-        first: 20,
+        first: 100,
         slug,
         retailerInventorySessionToken: invToken,
         zoneId: DEFAULT_ZONE_ID,
@@ -356,7 +361,8 @@ async function fetchCollectionProducts(
       },
       HASHES.CollectionProductsWithFeaturedProducts
     );
-    return data?.data?.collectionProducts?.items || [];
+    const items = data?.data?.collectionProducts?.items || [];
+    return items;
   } catch {
     return [];
   }
@@ -397,8 +403,159 @@ function toScrapedPrice(item: InstacartItem, query: string): ScrapedPrice | null
   };
 }
 
-// ---- Instacart search via collection browsing ----
-async function searchCostcoViaInstacart(
+// ---- Convert Search API items to ScrapedPrice ----
+// Search API items have a slightly different price nesting than collection items
+function searchItemToScrapedPrice(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  item: any,
+  query: string
+): ScrapedPrice | null {
+  const name = item.name;
+  if (!name) return null;
+
+  const priceStr =
+    item.price?.viewSection?.priceValueString ||
+    item.price?.viewSection?.itemCard?.priceString?.replace(/[^0-9.]/g, "");
+  const price = priceStr ? parseFloat(priceStr) : NaN;
+  if (!price || price <= 0) return null;
+
+  const unit =
+    item.price?.viewSection?.itemCard?.pricingUnitString || item.size || "each";
+  const imageUrl = item.viewSection?.itemImage?.url || undefined;
+
+  const flyerParams = new URLSearchParams();
+  flyerParams.set("store", "Costco");
+  flyerParams.set("product", name);
+  flyerParams.set("price", price.toString());
+  flyerParams.set("currency", "CAD");
+  if (imageUrl) flyerParams.set("image", imageUrl);
+  if (unit) flyerParams.set("unit", unit);
+  flyerParams.set("q", query);
+
+  return {
+    storeName: "Costco",
+    price,
+    currency: "CAD",
+    productName: name,
+    unit,
+    imageUrl,
+    productUrl: `/flyer-item?${flyerParams.toString()}`,
+  };
+}
+
+// ---- Invalidate all cached tokens so next call fetches fresh ones ----
+function invalidateTokens() {
+  guestToken = null;
+  tokenExpiresAt = 0;
+  inventoryToken = null;
+  inventoryTokenExpiresAt = 0;
+  collectionCache = [];
+  collectionCacheExpiresAt = 0;
+}
+
+// ---- Instacart Search API (direct product search) ----
+async function searchCostcoViaInstacartSearchOnce(
+  query: string,
+  postalCode: string
+): Promise<ScrapedPrice[]> {
+  const token = await getGuestToken();
+  if (!token) return [];
+
+  const invToken = await getInventoryToken(token, postalCode);
+  if (!invToken) return [];
+
+  try {
+    const data = await gql(
+      token,
+      "Search",
+      {
+        retailerInventorySessionToken: invToken,
+        query,
+        shopId: DEFAULT_SHOP_ID,
+        postalCode: postalCode || DEFAULT_POSTAL,
+        zoneId: DEFAULT_ZONE_ID,
+      },
+      HASHES.Search
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const items: any[] =
+      data?.data?.searchResults?.primaryItemResultList?.items || [];
+    if (items.length === 0) return [];
+
+    const results: ScrapedPrice[] = [];
+    const seen = new Set<string>();
+    const q = query.toLowerCase();
+    const qWords = q.split(/\s+/).filter((w) => w.length >= 2);
+    const wordVariants: string[][] = qWords.map((w) => {
+      const variants = [w];
+      if (w.endsWith("s") && w.length > 3) variants.push(w.slice(0, -1));
+      return variants;
+    });
+
+    for (const item of items) {
+      const itemName = (item.name || "").toLowerCase();
+
+      // Relevance filter (same logic as collection browsing)
+      if (qWords.length >= 2) {
+        let wordHits = 0;
+        for (const variants of wordVariants) {
+          const hasMatch = variants.some((v) => {
+            const re = new RegExp(
+              `\\b${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+              "i"
+            );
+            return re.test(itemName);
+          });
+          if (hasMatch) wordHits++;
+        }
+        const minHits =
+          qWords.length <= 3
+            ? qWords.length
+            : Math.ceil((qWords.length * 2) / 3);
+        if (wordHits < minHits) continue;
+      } else if (qWords.length === 1) {
+        const w = qWords[0];
+        const wSingular =
+          w.endsWith("s") && w.length > 3 ? w.slice(0, -1) : w;
+        const re = new RegExp(`\\b(${w}|${wSingular})`, "i");
+        if (!re.test(itemName)) continue;
+      }
+
+      const sp = searchItemToScrapedPrice(item, query);
+      if (!sp) continue;
+
+      const key = `${sp.productName}-${sp.price}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      results.push(sp);
+    }
+
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+// ---- Instacart Search with retry ----
+async function searchCostcoViaInstacartSearch(
+  query: string,
+  postalCode: string
+): Promise<ScrapedPrice[]> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const results = await searchCostcoViaInstacartSearchOnce(
+      query,
+      postalCode
+    );
+    if (results.length > 0) return results;
+    invalidateTokens();
+  }
+  return [];
+}
+
+// ---- Instacart search via collection browsing (single attempt) ----
+async function searchCostcoViaInstacartOnce(
   query: string,
   postalCode: string
 ): Promise<ScrapedPrice[]> {
@@ -432,8 +589,8 @@ async function searchCostcoViaInstacart(
     for (const item of items) {
       const itemName = (item.name || "").toLowerCase();
 
-      // Relevance filter: for multi-word queries, require at least half the
-      // query words to appear as whole words (not substrings like "oil" in "foil")
+      // Relevance filter: for multi-word queries, require all query words
+      // to appear as whole words (not substrings like "oil" in "foil")
       if (qWords.length >= 2) {
         let wordHits = 0;
         for (const variants of wordVariants) {
@@ -444,8 +601,9 @@ async function searchCostcoViaInstacart(
           });
           if (hasMatch) wordHits++;
         }
-        // Require at least half of query words to match
-        if (wordHits < Math.ceil(qWords.length / 2)) continue;
+        // Require all query words for short queries, at least 2/3 for longer ones
+        const minHits = qWords.length <= 3 ? qWords.length : Math.ceil(qWords.length * 2 / 3);
+        if (wordHits < minHits) continue;
       } else if (qWords.length === 1) {
         // Single word: whole-word match
         const w = qWords[0];
@@ -466,6 +624,21 @@ async function searchCostcoViaInstacart(
   }
 
   return results;
+}
+
+// ---- Instacart search with retry + token invalidation ----
+async function searchCostcoViaInstacart(
+  query: string,
+  postalCode: string
+): Promise<ScrapedPrice[]> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const results = await searchCostcoViaInstacartOnce(query, postalCode);
+    if (results.length > 0) return results;
+    // Invalidate cached tokens before retrying — the API may have
+    // rejected stale credentials or hit a transient error.
+    invalidateTokens();
+  }
+  return [];
 }
 
 // ---- Flipp fallback for flyer/sale items ----
@@ -567,11 +740,18 @@ export const costcoScraper: Scraper = {
     if (countryCode !== "CA") return [];
     const postal = postalCode || DEFAULT_POSTAL;
 
-    // Run Instacart collection browsing + Flipp flyer search in parallel
-    const [instacartResults, flippResults] = await Promise.all([
-      searchCostcoViaInstacart(query, postal),
+    // Run Search API + Flipp flyer search in parallel
+    // Search API is the primary method; collection browsing is fallback
+    const [searchResults, flippResults] = await Promise.all([
+      searchCostcoViaInstacartSearch(query, postal),
       searchCostcoViaFlipp(query, postal),
     ]);
+
+    // If Search API returned results, use them; otherwise fallback to collection browsing
+    const instacartResults =
+      searchResults.length > 0
+        ? searchResults
+        : await searchCostcoViaInstacart(query, postal);
 
     // Merge: Instacart results take priority (real-time prices), Flipp adds sale items
     const combined = [...instacartResults];

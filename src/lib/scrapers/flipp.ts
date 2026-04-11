@@ -195,6 +195,13 @@ const NON_FOOD_KEYWORDS = [
   "lawnmower", "lawn mower", "snow blower", "leaf blower",
   "bicycle", "bike", "treadmill", "elliptical", "dumbbell",
   "kayak", "tent", "sleeping bag",
+  "guitar", "ukulele", "banjo", "mandolin", "violin", "cello", "bass guitar",
+  "amp", "amplifier", "fender", "epiphone", "gibson", "les paul", "stratocaster",
+  "telecaster", "ibanez", "yamaha guitar", "drum kit", "drumstick", "cymbal",
+  "keyboard piano", "synthesizer", "microphone", "musical instruments",
+  "phone", "smartphone", "cellphone", "cell phone", "mobile phone", "android",
+  "unlocked phone", "refurbished phone",
+  "computer", "desktop", "hard drive", "ssd", "ram", "motherboard", "gpu",
   "titanium case", "trail loop", "ultra 2",
   // Bath / Body / Personal care / Household
   "epsom", "scented", "bath bomb", "bubble bath", "body wash", "body lotion",
@@ -253,8 +260,9 @@ async function flippSearch(
 
     const store = item.merchant_name || item.merchant || "Unknown Store";
 
-    // Skip non-food stores
-    if (NON_FOOD_STORES.has(store.toLowerCase().trim())) continue;
+    // Skip non-food stores (substring match — store names from Flipp may include suffixes)
+    const storeLower = store.toLowerCase().trim();
+    if ([...NON_FOOD_STORES].some((s) => storeLower.includes(s) || s.includes(storeLower))) continue;
 
     // Note: non-food product filtering is done in filterRelevant()
     // based on whether the query is a food term

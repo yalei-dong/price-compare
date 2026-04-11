@@ -226,35 +226,6 @@ function detectStoreMeta(source: string): { logo: string; type: "online" | "loca
   return STORE_META["default"];
 }
 
-/** Strip Google redirect wrappers (e.g. google.com/url?q=...) and return the actual store URL. */
-function extractDirectUrl(rawUrl: string): string {
-  if (!rawUrl) return "";
-  try {
-    const parsed = new URL(rawUrl);
-    // Google redirect: google.com/url?q=<actual>&...  or  google.com/aclk?...&adurl=<actual>
-    if (parsed.hostname.includes("google.") && parsed.pathname === "/url") {
-      const q = parsed.searchParams.get("q") || parsed.searchParams.get("url");
-      if (q) return q;
-    }
-    if (parsed.hostname.includes("google.") && parsed.searchParams.has("adurl")) {
-      return parsed.searchParams.get("adurl")!;
-    }
-  } catch {
-    // not a valid URL, return as-is
-  }
-  return rawUrl;
-}
-
-/** Check whether a URL ends up on google.com (Shopping page, redirect, etc.) */
-function isGoogleUrl(url: string): boolean {
-  if (!url) return true;
-  try {
-    return new URL(url).hostname.includes("google.");
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Map a store name (from SerpAPI `source`) to a direct search URL on that store's website.
  * This is the fallback when SerpAPI only gives us Google Shopping links.
@@ -386,7 +357,7 @@ interface CacheEntry {
 }
 
 const SERP_CACHE = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour (short to avoid stale results after deploys)
+const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours — longer TTL to reduce API calls
 const MAX_CACHE_SIZE = 500;               // evict oldest when exceeded
 // Build-time version — changes on every deploy to bust stale cache
 const CACHE_VERSION = Date.now().toString(36);
@@ -412,6 +383,47 @@ function setCachedPrices(key: string, data: PriceEntry[]): void {
     if (oldest !== undefined) SERP_CACHE.delete(oldest);
   }
   SERP_CACHE.set(key, { data, ts: Date.now() });
+}
+
+// ---------------------------------------------------------------------------
+// SerpApi monthly budget guard (in-memory, resets on cold start / deploy)
+// ---------------------------------------------------------------------------
+
+let serpUsageCount = 0;
+let serpUsageMonth = new Date().getMonth();
+
+function serpBudgetRemaining(): boolean {
+  const now = new Date().getMonth();
+  if (now !== serpUsageMonth) {
+    serpUsageCount = 0;
+    serpUsageMonth = now;
+  }
+  return serpUsageCount < SERPAPI_MONTHLY_BUDGET;
+}
+
+function serpBudgetIncrement(): void {
+  serpUsageCount++;
+}
+
+// ---------------------------------------------------------------------------
+// Scraper-only fetch (no SerpApi / free-provider cascade) — used for
+// homepage popular items to avoid burning paid API quota.
+// ---------------------------------------------------------------------------
+
+async function fetchScrapedPricesOnly(
+  query: string,
+  countryCode: string
+): Promise<PriceEntry[]> {
+  const cKey = serpCacheKey(query, countryCode);
+  const cached = getCachedPrices(cKey);
+  if (cached) return cached;
+
+  if (!hasScrapers(countryCode)) return [];
+  const results = await fetchScrapedPrices(query, countryCode);
+
+  const filtered = filterMisleadingResults(results, query);
+  if (filtered.length > 0) setCachedPrices(cKey, filtered);
+  return filtered;
 }
 
 // ---------------------------------------------------------------------------
@@ -522,6 +534,14 @@ async function fetchPricesFromFreeProviders(
   const today = new Date().toISOString().slice(0, 10);
   return extracted.map((item, idx) => {
     const meta = detectStoreMeta(item.storeName);
+    // Build in-app flyer detail page URL instead of external link
+    const fp = new URLSearchParams();
+    fp.set("store", item.storeName);
+    fp.set("product", query);
+    fp.set("price", item.price.toString());
+    fp.set("currency", currency);
+    fp.set("unit", "each");
+    fp.set("q", query);
     return {
       storeId: `free-${result.provider}-${idx}`,
       storeName: item.storeName,
@@ -531,7 +551,7 @@ async function fetchPricesFromFreeProviders(
       price: item.price,
       currency,
       unit: "each",
-      url: item.url,
+      url: `/flyer-item?${fp.toString()}`,
       thumbnail: undefined,
       lastUpdated: today,
       inStock: true,
@@ -620,6 +640,20 @@ const KNOWN_FOODS = new Set([
   "hazelnut", "hazelnuts", "sunflower", "sesame", "chia", "flax",
 ]);
 
+/** Non-grocery store names — when searching for food, results from these stores
+ *  are almost certainly wrong (phones, electronics, hardware, etc.). */
+const NON_GROCERY_STORES = [
+  "best buy", "home depot", "home hardware", "lowes", "lowe's", "rona",
+  "canadian tire", "staples", "the source",
+  "cellular", "flex mobile", "mobile shop", "phone", "wireless",
+  "dbcs", "computer", "electronics", "newegg", "b&h photo",
+  "aliexpress", "wish.com", "temu",
+  "the brick", "leon's", "ikea", "sleep country",
+  "long & mcquade", "long and mcquade", "musical",
+  "apple store", "samsung store", "dell", "hp store", "lenovo",
+  "eb games", "gamestop",
+];
+
 /** Non-food product keywords — items containing these are clearly not groceries. */
 const NON_FOOD_KEYWORDS = [
   "watch", "smartwatch", "iwatch", "fitbit", "garmin",
@@ -637,7 +671,20 @@ const NON_FOOD_KEYWORDS = [
   "lawnmower", "lawn mower", "snow blower", "leaf blower",
   "bicycle", "bike", "treadmill", "elliptical", "dumbbell",
   "kayak", "tent", "sleeping bag",
+  "guitar", "ukulele", "banjo", "mandolin", "violin", "cello", "bass guitar",
+  "amp", "amplifier", "fender", "epiphone", "gibson", "les paul", "stratocaster",
+  "telecaster", "ibanez", "yamaha guitar", "drum kit", "drumstick", "cymbal",
+  "keyboard piano", "synthesizer", "microphone", "musical instruments",
+  "phone", "smartphone", "cellphone", "cell phone", "mobile phone", "android",
+  "iphone", "samsung galaxy", "pixel", "blackberry key", "blackberry classic",
+  "blackberry bold", "blackberry passport", "blackberry curve", "blackberry priv",
+  "unlocked phone", "refurbished phone",
+  "verizon", "at&t", "t-mobile", "sprint", "carrier",
+  "computer", "desktop", "hard drive", "ssd", "ram", "motherboard", "gpu",
+  " gb ", "16gb", "32gb", "64gb", "128gb", "256gb", "512gb",
   "titanium case", "trail loop",
+  "airtag", "airtags", "homepod", "apple pencil", "magic keyboard",
+  "magsafe", "lightning cable", "usb-c",
   // Bath / Body / Personal care / Household
   "epsom", "scented", "bath bomb", "bubble bath", "body wash", "body lotion",
   "shampoo", "conditioner", "hair dye", "hair color", "hair colour",
@@ -710,7 +757,7 @@ function pickBestThumbnail(prices: PriceEntry[], query: string): string {
   const qWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
 
   // Score each entry: how well does the product name match the query?
-  let best = withThumb[0];
+  let best: PriceEntry | null = null;
   let bestScore = -1;
 
   for (const p of withThumb) {
@@ -721,6 +768,8 @@ function pickBestThumbnail(prices: PriceEntry[], query: string): string {
     for (const w of qWords) {
       if (new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i").test(name)) matched++;
     }
+    // Require at least one query word to match — avoids picking unrelated thumbnails
+    if (matched === 0) continue;
     // Score: high match ratio, low name length
     const score = (matched / Math.max(qWords.length, 1)) * 100 - nameLen;
     if (score > bestScore) {
@@ -729,7 +778,7 @@ function pickBestThumbnail(prices: PriceEntry[], query: string): string {
     }
   }
 
-  return best.thumbnail || "";
+  return best?.thumbnail || "";
 }
 
 function filterMisleadingResults(results: PriceEntry[], query: string): PriceEntry[] {
@@ -738,7 +787,14 @@ function filterMisleadingResults(results: PriceEntry[], query: string): PriceEnt
 
   // Only filter out non-food products when searching for food
   if (isQueryFood) {
-    results = results.filter((r) => !isNonFoodItem(r.productName || ""));
+    results = results.filter((r) => {
+      // Check product name for non-food keywords
+      if (r.productName && isNonFoodItem(r.productName)) return false;
+      // Check store name for obvious non-grocery retailers
+      const store = r.storeName.toLowerCase();
+      if (NON_GROCERY_STORES.some((s) => store.includes(s))) return false;
+      return true;
+    });
   }
 
   if (queryWords.length === 0) return results;
@@ -760,13 +816,22 @@ function filterMisleadingResults(results: PriceEntry[], query: string): PriceEnt
 
     const nameWords = name.split(/[\s,/&+]+/).filter(Boolean);
 
-    // When a query word is a known food, reject products that contain
-    // ANY other known food/product-type word not in the query.
-    // e.g. "garlic" → reject "garlic shrimp", "garlic bread"
-    //      "raspberry" → reject "raspberry vinaigrette", "raspberry lemonade"
-    //      "peanut butter" → reject "peanut butter chocolate" (but keep "peanut butter")
+    // When a query word is a known food, reject products where the query food
+    // is just a modifier/ingredient for a DIFFERENT main product.
+    // e.g. "garlic" → reject "garlic shrimp" (shrimp is the main product)
+    //      "raspberry" → reject "raspberry vinaigrette" (vinaigrette is main)
+    // But KEEP products where the query food IS the main item:
+    //      "blackberry" → keep "blackberry jam", "blackberry pie"
+    //      "peanut butter" → keep "peanut butter"
+    // Heuristic: reject only if another known food appears BEFORE the query word
+    // (English pattern: "garlic shrimp" = garlic modifies shrimp)
+    // or if the product is clearly a different category.
     for (const qw of queryWords) {
       if (!KNOWN_FOODS.has(qw)) continue;
+      const qwIdx = nameWords.indexOf(qw);
+      // If query word not found by exact token, try substring match
+      const qwPosition = qwIdx >= 0 ? qwIdx : nameWords.findIndex((w) => w.includes(qw));
+
       for (const w of nameWords) {
         // Skip words that match any query word (incl. plurals)
         if (querySet.has(w)) continue;
@@ -777,7 +842,18 @@ function filterMisleadingResults(results: PriceEntry[], query: string): PriceEnt
         if (matchesQuery) continue;
         // Skip size tokens and short words
         if (/^\d/.test(w) || w.length <= 2) continue;
-        if (KNOWN_FOODS.has(w)) return false;
+        if (!KNOWN_FOODS.has(w)) continue;
+
+        // The other food word is in the name. Check positioning:
+        // If the query food appears first (e.g. "blackberry jam"), it's the
+        // main item → keep. If the other food appears first (e.g. "garlic shrimp"),
+        // the query food is a modifier → reject.
+        const otherIdx = nameWords.indexOf(w);
+        if (qwPosition >= 0 && otherIdx >= 0 && qwPosition < otherIdx) {
+          // Query word comes first — it's the main product, other word is form/type → keep
+          continue;
+        }
+        return false;
       }
     }
     return true;
@@ -788,7 +864,8 @@ function filterMisleadingResults(results: PriceEntry[], query: string): PriceEnt
 // Main price fetcher: Always scrape (free) + supplement with APIs if thin
 // ---------------------------------------------------------------------------
 
-const MIN_SCRAPE_RESULTS = 5; // Below this, also query paid/free search APIs
+const MIN_SCRAPE_RESULTS = 6; // Below this, also query free search APIs
+const SERPAPI_MONTHLY_BUDGET = 150; // Max SerpApi searches/month to stay under plan
 
 /** Merge price entries and keep cheapest per store */
 function mergeAndDedup(entries: PriceEntry[]): PriceEntry[] {
@@ -830,7 +907,8 @@ export async function fetchGoogleShoppingPrices(
     // Still thin? Fall back to SerpAPI (paid, last resort)
     if (results.length < MIN_SCRAPE_RESULTS) {
       const apiKey = process.env.SERPAPI_KEY;
-      if (apiKey) {
+      if (apiKey && serpBudgetRemaining()) {
+        serpBudgetIncrement();
         const serpResults = await fetchFromSerpAPI(query, countryCode, serpLocation, apiKey);
         results = mergeAndDedup([...results, ...serpResults]);
       }
@@ -894,28 +972,15 @@ async function fetchFromSerpAPI(
       .map((result, idx) => {
         const meta = detectStoreMeta(result.source);
 
-        // Try to get a non-Google URL from SerpAPI fields
-        const rawCandidates = [
-          result.link,
-          result.source_info?.link,
-          result.product_link,
-        ].filter(Boolean) as string[];
-
-        const extracted = rawCandidates.map((u) => extractDirectUrl(u));
-
-        // 1st choice: a direct (non-Google) URL extracted from SerpAPI
-        let url = extracted.find((u) => !isGoogleUrl(u)) || "";
-
-        // 2nd choice: the original SerpAPI link (even if it's a Google redirect)
-        if (!url) {
-          url = rawCandidates[0] || "";
-        }
-
-        // 3rd choice: build a direct store search URL as last resort
-        if (!url || isGoogleUrl(url)) {
-          const storeSearch = buildStoreDirectUrl(result.source, query);
-          if (storeSearch) url = storeSearch;
-        }
+        // Build in-app flyer detail page URL
+        const fp = new URLSearchParams();
+        fp.set("store", result.source);
+        fp.set("product", result.title || query);
+        fp.set("price", result.extracted_price.toString());
+        fp.set("currency", glConfig.currency);
+        if (result.thumbnail) fp.set("image", result.thumbnail);
+        fp.set("unit", "each");
+        fp.set("q", query);
 
         return {
           storeId: `serp-${glConfig.gl}-${idx}`,
@@ -926,10 +991,11 @@ async function fetchFromSerpAPI(
           price: result.extracted_price,
           currency: glConfig.currency,
           unit: "each",
-          url,
+          url: `/flyer-item?${fp.toString()}`,
           thumbnail: result.thumbnail || undefined,
           lastUpdated: today,
           inStock: true,
+          productName: result.title || undefined,
         };
       });
 
@@ -1028,11 +1094,10 @@ export async function searchProductsReal(
       const popularItems = ["milk", "eggs", "bananas", "chicken breast", "rice", "olive oil", "bread", "cola", "avocado", "toothpaste"];
       const liveProducts: Product[] = [];
 
-      // Fetch in parallel for speed
+      // Fetch in parallel — scrapers only for homepage (no SerpApi spend)
       const results = await Promise.all(
         popularItems.map(async (item) => {
-          const metro = geo ? getMetroConfig(geo) : undefined;
-          const prices = await fetchGoogleShoppingPrices(item, localeCode, metro?.serpLocation);
+          const prices = await fetchScrapedPricesOnly(item, localeCode);
           if (prices.length === 0) return null;
           const thumb = pickBestThumbnail(prices, item);
           return {

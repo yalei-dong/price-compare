@@ -26,7 +26,7 @@ interface CacheEntry {
 }
 
 const SCRAPE_CACHE = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const MAX_CACHE_SIZE = 500;
 
 function cacheKey(query: string, country: string): string {
@@ -262,8 +262,25 @@ export async function fetchScrapedPrices(
 
   if (allScraped.length === 0) return [];
 
-  const deduped = dedup(toPriceEntries(allScraped, countryCode));
-  const entries = await aiFilterRelevant(deduped, query);
+  const allEntries = toPriceEntries(allScraped, countryCode);
+
+  // Pre-filter: require product name to contain all query words before dedup.
+  // This prevents dedup from choosing the cheapest irrelevant item per store
+  // (e.g. "canola oil" for a "olive oil" query) and discarding the real match.
+  const qWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
+  const preFiltered = qWords.length > 0
+    ? allEntries.filter((e) => {
+        const name = (e.productName || "").toLowerCase();
+        if (!name) return true; // keep items with no name (can't filter)
+        return qWords.every((w) => name.includes(w));
+      })
+    : allEntries;
+
+  // If pre-filter removed everything, fall back to unfiltered
+  const toDedup = preFiltered.length > 0 ? preFiltered : allEntries;
+
+  const filtered = await aiFilterRelevant(toDedup, query);
+  const entries = dedup(filtered);
   setCache(key, entries);
   return entries;
 }

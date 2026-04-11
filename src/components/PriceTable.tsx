@@ -1,7 +1,148 @@
 "use client";
 
+import { useState } from "react";
 import { PriceEntry, CURRENCY_SYMBOLS } from "@/lib/types";
 import { useTranslation } from "@/hooks/useTranslation";
+
+export interface FlyerModalData {
+  store: string;
+  product: string;
+  price: string;
+  currency: string;
+  image: string;
+  validFrom: string;
+  validTo: string;
+  unit: string;
+  saleStory: string;
+  storeLogo: string;
+}
+
+export function parseFlyerUrl(url: string): FlyerModalData | null {
+  if (!url.startsWith("/flyer-item?")) return null;
+  try {
+    const params = new URLSearchParams(url.split("?")[1]);
+    return {
+      store: params.get("store") || "Unknown Store",
+      product: params.get("product") || "Flyer Item",
+      price: params.get("price") || "",
+      currency: params.get("currency") || "CAD",
+      image: params.get("image") || "",
+      validFrom: params.get("from") || "",
+      validTo: params.get("to") || "",
+      unit: params.get("unit") || "each",
+      saleStory: params.get("sale") || "",
+      storeLogo: params.get("logo") || "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function FlyerDetailModal({ data, onClose }: { data: FlyerModalData; onClose: () => void }) {
+  const priceNum = parseFloat(data.price);
+  const currSymbol = CURRENCY_SYMBOLS[data.currency] || "$";
+
+  const formatDate = (iso: string) => {
+    if (!iso) return "";
+    try {
+      return new Date(iso).toLocaleDateString("en-CA", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return iso;
+    }
+  };
+
+  const fromStr = formatDate(data.validFrom);
+  const toStr = formatDate(data.validTo);
+  const isExpired = data.validTo ? new Date(data.validTo) < new Date() : false;
+  const daysLeft = data.validTo
+    ? Math.max(0, Math.ceil((new Date(data.validTo).getTime() - Date.now()) / 86400000))
+    : null;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        {/* Store header */}
+        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4">
+          <div className="flex items-center gap-3">
+            {data.storeLogo ? (
+              <img
+                src={data.storeLogo}
+                alt={data.store}
+                className="w-10 h-10 rounded-lg bg-white object-contain p-1"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <span className="text-3xl">📰</span>
+            )}
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-white">{data.store}</h2>
+              <p className="text-indigo-200 text-sm">Weekly Flyer Deal</p>
+            </div>
+            <button onClick={onClose} className="text-white/70 hover:text-white text-2xl leading-none">✕</button>
+          </div>
+        </div>
+
+        <div className="p-6 max-h-[70vh] overflow-y-auto">
+          {/* Product image */}
+          {data.image && (
+            <div className="bg-gray-50 rounded-xl p-4 mb-4 flex justify-center">
+              <img
+                src={data.image}
+                alt={data.product}
+                className="max-h-48 object-contain"
+                onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = "none"; }}
+              />
+            </div>
+          )}
+
+          <h3 className="text-lg font-bold text-gray-900 mb-2">{data.product}</h3>
+
+          {data.saleStory && (
+            <p className="text-sm text-orange-600 font-medium mb-4 bg-orange-50 px-3 py-1.5 rounded-lg inline-block">
+              🏷️ {data.saleStory}
+            </p>
+          )}
+
+          {!isNaN(priceNum) && priceNum > 0 && (
+            <div className="flex items-baseline gap-2 mb-4">
+              <span className="text-3xl font-bold text-green-700">{currSymbol}{priceNum.toFixed(2)}</span>
+              <span className="text-gray-500 text-sm">{data.currency}</span>
+              {data.unit && data.unit !== "each" && (
+                <span className="text-gray-500 text-sm">/ {data.unit}</span>
+              )}
+            </div>
+          )}
+
+          {(fromStr || toStr) && (
+            <div className={`rounded-lg px-4 py-3 mb-4 ${isExpired ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"}`}>
+              <div className="flex items-center gap-2">
+                <span>{isExpired ? "⏰" : "✅"}</span>
+                <div>
+                  {isExpired ? (
+                    <span className="text-red-700 text-sm font-medium">This deal has expired</span>
+                  ) : (
+                    <>
+                      <span className="text-green-700 text-sm font-medium">Valid: {fromStr} – {toStr}</span>
+                      {daysLeft !== null && daysLeft <= 3 && (
+                        <span className="text-orange-600 text-xs ml-2">
+                          ({daysLeft === 0 ? "Ends today!" : `${daysLeft} day${daysLeft > 1 ? "s" : ""} left`})
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface PriceTableProps {
   prices: PriceEntry[];
@@ -10,6 +151,7 @@ interface PriceTableProps {
 
 export default function PriceTable({ prices, sortBy = "price" }: PriceTableProps) {
   const t = useTranslation();
+  const [flyerModal, setFlyerModal] = useState<FlyerModalData | null>(null);
   const sorted = [...prices].sort((a, b) => {
     if (sortBy === "price") return a.price - b.price;
     return a.storeName.localeCompare(b.storeName);
@@ -25,6 +167,7 @@ export default function PriceTable({ prices, sortBy = "price" }: PriceTableProps
 
   return (
     <div className="overflow-x-auto">
+      {flyerModal && <FlyerDetailModal data={flyerModal} onClose={() => setFlyerModal(null)} />}
       <table className="w-full text-left table-fixed">
         <thead>
           <tr className="border-b-2 border-gray-200">
@@ -40,8 +183,11 @@ export default function PriceTable({ prices, sortBy = "price" }: PriceTableProps
           {sorted.map((price, idx) => {
             const isBest = price.inStock && lowestPrice !== null && price.price === lowestPrice;
             const isInternal = price.url?.startsWith("/");
+            const flyerData = price.url ? parseFlyerUrl(price.url) : null;
             const handleRowClick = () => {
-              if (price.url) {
+              if (flyerData) {
+                setFlyerModal(flyerData);
+              } else if (price.url) {
                 if (isInternal) {
                   window.location.href = price.url;
                 } else {

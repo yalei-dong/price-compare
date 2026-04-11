@@ -77,16 +77,25 @@ async function scrapeBanner(
       if (!price || price <= 0) continue;
 
       const name = [product.brand, product.name].filter(Boolean).join(" ");
+      const imageUrl = product.imageAssets?.[0]?.mediumUrl || product.imageAssets?.[0]?.smallUrl || undefined;
+      const unit = product.prices?.price?.unit || "each";
+      const flyerParams = new URLSearchParams();
+      flyerParams.set("store", banner.name);
+      flyerParams.set("product", name || query);
+      flyerParams.set("price", price.toString());
+      flyerParams.set("currency", "CAD");
+      if (imageUrl) flyerParams.set("image", imageUrl);
+      if (unit) flyerParams.set("unit", unit);
+      if (product.packageSize) flyerParams.set("size", product.packageSize);
+      flyerParams.set("q", query);
       results.push({
         storeName: banner.name,
         price,
         currency: "CAD",
         productName: name || query,
-        productUrl: product.link
-          ? `${banner.baseUrl}${product.link}`
-          : undefined,
-        imageUrl: product.imageAssets?.[0]?.mediumUrl || product.imageAssets?.[0]?.smallUrl || undefined,
-        unit: product.prices?.price?.unit || "each",
+        productUrl: `/flyer-item?${flyerParams.toString()}`,
+        imageUrl,
+        unit,
       });
     }
 
@@ -129,13 +138,23 @@ async function scrapeBannerHTML(
           const price = p.prices?.price?.value ?? p.price ?? null;
           if (!price || price <= 0) continue;
 
+          const pName = p.name || p.title || query;
+          const pImage = p.imageAssets?.[0]?.mediumUrl || undefined;
+          const fp = new URLSearchParams();
+          fp.set("store", banner.name);
+          fp.set("product", pName);
+          fp.set("price", price.toString());
+          fp.set("currency", "CAD");
+          if (pImage) fp.set("image", pImage);
+          fp.set("unit", "each");
+          fp.set("q", query);
           results.push({
             storeName: banner.name,
             price,
             currency: "CAD",
-            productName: p.name || p.title || query,
-            productUrl: p.link ? `${banner.baseUrl}${p.link}` : undefined,
-            imageUrl: p.imageAssets?.[0]?.mediumUrl || undefined,
+            productName: pName,
+            productUrl: `/flyer-item?${fp.toString()}`,
+            imageUrl: pImage,
             unit: "each",
           });
         }
