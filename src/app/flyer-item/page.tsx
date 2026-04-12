@@ -53,6 +53,8 @@ function FlyerItemContent() {
       ? `https://flipp.com/flyer/${flyerId}?item_id=${itemId}`
       : null;
 
+  const isFlyer = !!(flyerId || validFrom || validTo);
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       {/* Back nav */}
@@ -89,14 +91,16 @@ function FlyerItemContent() {
             )}
             <div>
               <h1 className="text-xl font-bold text-white">{store}</h1>
-              <p className="text-indigo-200 text-sm">Weekly Flyer Deal</p>
+              <p className="text-indigo-200 text-sm">
+                {isFlyer ? "Weekly Flyer Deal" : "Price Found Online"}
+              </p>
             </div>
           </div>
         </div>
 
         {/* Product image */}
         <div className="p-6">
-          {image && (
+          {image ? (
             <div className="bg-gray-50 rounded-xl p-4 mb-6 flex justify-center">
               <img
                 src={image}
@@ -107,6 +111,10 @@ function FlyerItemContent() {
                     "none";
                 }}
               />
+            </div>
+          ) : (
+            <div className="bg-gray-50 rounded-xl p-4 mb-6 flex justify-center">
+              <span className="text-7xl">🛒</span>
             </div>
           )}
 

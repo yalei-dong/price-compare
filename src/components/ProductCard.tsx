@@ -70,8 +70,8 @@ export default function ProductCard({ product, onAddToList }: ProductCardProps) 
           {lowestPrice && (
             <a
               href={lowestPrice.url || `/product/${product.id}`}
-              target={lowestPrice.url ? "_blank" : undefined}
-              rel={lowestPrice.url ? "noopener noreferrer" : undefined}
+              target={lowestPrice.url?.startsWith("http") ? "_blank" : undefined}
+              rel={lowestPrice.url?.startsWith("http") ? "noopener noreferrer" : undefined}
               className={`block bg-green-50 border border-green-200 rounded-lg p-3 mb-3 ${
                 lowestPrice.url ? "hover:border-green-400 hover:bg-green-100" : "hover:border-green-300"
               } transition-colors`}
@@ -161,8 +161,8 @@ export default function ProductCard({ product, onAddToList }: ProductCardProps) 
                   <a
                     key={sp.storeId}
                     href={sp.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    target={sp.url.startsWith("http") ? "_blank" : undefined}
+                    rel={sp.url.startsWith("http") ? "noopener noreferrer" : undefined}
                     className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-1.5 hover:bg-blue-50 hover:border-blue-200 border border-transparent cursor-pointer transition-colors"
                     onClick={(e) => e.stopPropagation()}
                   >

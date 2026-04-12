@@ -445,15 +445,21 @@ function extractStoreFromUrl(url: string): string {
 function regexExtractPrices(
   results: WebSearchResult[],
   countryCode: string
-): { storeName: string; price: number; url: string }[] {
-  const out: { storeName: string; price: number; url: string }[] = [];
+): { storeName: string; price: number; url: string; productName: string; snippet: string }[] {
+  const out: { storeName: string; price: number; url: string; productName: string; snippet: string }[] = [];
   for (const r of results) {
     const text = `${r.title} ${r.snippet}`;
     const matches = [...text.matchAll(new RegExp(GENERIC_PRICE_RE.source, "g"))];
     if (matches.length > 0) {
       const price = parseFloat(matches[0][1]);
       if (price > 0 && price < 10000) {
-        out.push({ storeName: extractStoreFromUrl(r.url), price, url: r.url });
+        out.push({
+          storeName: extractStoreFromUrl(r.url),
+          price,
+          url: r.url,
+          productName: r.title || "",
+          snippet: (r.snippet || "").replace(/<[^>]*>/g, ""),
+        });
       }
     }
   }
@@ -534,14 +540,15 @@ async function fetchPricesFromFreeProviders(
   const today = new Date().toISOString().slice(0, 10);
   return extracted.map((item, idx) => {
     const meta = detectStoreMeta(item.storeName);
-    // Build in-app flyer detail page URL instead of external link
+    // Build in-app flyer detail page URL with all available info
     const fp = new URLSearchParams();
     fp.set("store", item.storeName);
-    fp.set("product", query);
+    fp.set("product", item.productName || query);
     fp.set("price", item.price.toString());
     fp.set("currency", currency);
     fp.set("unit", "each");
     fp.set("q", query);
+    if (item.snippet) fp.set("sale", item.snippet.slice(0, 200));
     return {
       storeId: `free-${result.provider}-${idx}`,
       storeName: item.storeName,
@@ -555,6 +562,7 @@ async function fetchPricesFromFreeProviders(
       thumbnail: undefined,
       lastUpdated: today,
       inStock: true,
+      productName: item.productName || undefined,
     };
   });
 }
@@ -801,17 +809,42 @@ function filterMisleadingResults(results: PriceEntry[], query: string): PriceEnt
 
   const querySet = new Set(queryWords);
 
+  /** Check whether any variant (singular/plural) of a word appears in text as a whole word */
+  function wordMatchesText(word: string, text: string): boolean {
+    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // Check exact word and common plural/singular variants with word boundaries
+    const variants: string[] = [word];
+    // berry → berries, cherry → cherries
+    if (word.endsWith("y")) variants.push(word.slice(0, -1) + "ies");
+    // berries → berry
+    if (word.endsWith("ies")) variants.push(word.slice(0, -3) + "y");
+    // potato → potatoes, tomato → tomatoes
+    if (word.endsWith("o")) variants.push(word + "es");
+    if (word.endsWith("oes")) variants.push(word.slice(0, -2));
+    // mango → mangos / mangoes
+    if (word.endsWith("s")) variants.push(word.slice(0, -1));
+    if (!word.endsWith("s")) variants.push(word + "s");
+    // peach → peaches
+    if (/(?:sh|ch|s|x|z)$/.test(word)) variants.push(word + "es");
+    if (word.endsWith("es")) variants.push(word.slice(0, -2));
+    return variants.some((v) => new RegExp(`\\b${esc(v)}\\b`, "i").test(text));
+  }
+
   return results.filter((r) => {
     const name = (r.productName || "").toLowerCase();
     if (!name) return true; // keep items with no name info
 
-    // Product name must contain every query word
-    if (!queryWords.every((w) => name.includes(w))) return false;
+    // Product name must contain every query word (with plural/singular tolerance)
+    if (!queryWords.every((w) => wordMatchesText(w, name))) {
+      return false;
+    }
 
     // Reject products where the food word is used as a qualifier
     // e.g. "Pepsi Zero Sugar" when searching "sugar"
     for (const qw of queryWords) {
-      if (KNOWN_FOODS.has(qw) && isFoodUsedAsQualifier(name, qw)) return false;
+      if (KNOWN_FOODS.has(qw) && isFoodUsedAsQualifier(name, qw)) {
+        return false;
+      }
     }
 
     const nameWords = name.split(/[\s,/&+]+/).filter(Boolean);
@@ -829,28 +862,45 @@ function filterMisleadingResults(results: PriceEntry[], query: string): PriceEnt
     for (const qw of queryWords) {
       if (!KNOWN_FOODS.has(qw)) continue;
       const qwIdx = nameWords.indexOf(qw);
-      // If query word not found by exact token, try substring match
-      const qwPosition = qwIdx >= 0 ? qwIdx : nameWords.findIndex((w) => w.includes(qw));
+      // If query word not found by exact token, try substring/plural match
+      const qwPosition = qwIdx >= 0 ? qwIdx : nameWords.findIndex((w) => w.includes(qw) || wordMatchesText(qw, w));
+
+      // If the query food is the last food-word in the name, it's the head noun
+      // (e.g. "Cotton Candy Grapes" → grapes is the product) — always keep
+      const lastFoodIdx = (() => {
+        for (let i = nameWords.length - 1; i >= 0; i--) {
+          if (KNOWN_FOODS.has(nameWords[i]) || wordMatchesText(qw, nameWords[i])) return i;
+        }
+        return -1;
+      })();
+      if (qwPosition >= 0 && lastFoodIdx >= 0 && qwPosition >= lastFoodIdx) continue;
 
       for (const w of nameWords) {
         // Skip words that match any query word (incl. plurals)
         if (querySet.has(w)) continue;
         let matchesQuery = false;
         for (const q of queryWords) {
-          if (w.includes(q) || q.includes(w)) { matchesQuery = true; break; }
+          if (w.includes(q) || q.includes(w) || wordMatchesText(q, w)) { matchesQuery = true; break; }
         }
         if (matchesQuery) continue;
         // Skip size tokens and short words
         if (/^\d/.test(w) || w.length <= 2) continue;
         if (!KNOWN_FOODS.has(w)) continue;
 
-        // The other food word is in the name. Check positioning:
-        // If the query food appears first (e.g. "blackberry jam"), it's the
-        // main item → keep. If the other food appears first (e.g. "garlic shrimp"),
-        // the query food is a modifier → reject.
+        // The other food word is in the name. Check positioning using
+        // English head-noun rule: the LAST noun in a compound is the product.
+        // "duck egg" → egg is the product (reject for "duck" query)
+        // "garlic shrimp" → shrimp is the product (reject for "garlic" query)
+        // "blackberry pie" → pie is the product (reject for "blackberry" query)
         const otherIdx = nameWords.indexOf(w);
         if (qwPosition >= 0 && otherIdx >= 0 && qwPosition < otherIdx) {
-          // Query word comes first — it's the main product, other word is form/type → keep
+          // Query word comes first, other food comes after.
+          // If the other food word is the head noun (last food word), the
+          // product is the OTHER food, not the query food → reject.
+          if (otherIdx >= lastFoodIdx) {
+            return false;
+          }
+          // Otherwise it's an intermediate food word → keep checking
           continue;
         }
         return false;

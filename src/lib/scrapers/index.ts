@@ -268,11 +268,27 @@ export async function fetchScrapedPrices(
   // This prevents dedup from choosing the cheapest irrelevant item per store
   // (e.g. "canola oil" for a "olive oil" query) and discarding the real match.
   const qWords = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
+
+  /** Check word with common plural/singular variants using word boundaries */
+  function fuzzyIncludes(text: string, word: string): boolean {
+    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const variants: string[] = [word];
+    if (word.endsWith("y")) variants.push(word.slice(0, -1) + "ies");
+    if (word.endsWith("ies")) variants.push(word.slice(0, -3) + "y");
+    if (word.endsWith("o")) variants.push(word + "es");
+    if (word.endsWith("oes")) variants.push(word.slice(0, -2));
+    if (word.endsWith("s")) variants.push(word.slice(0, -1));
+    if (!word.endsWith("s")) variants.push(word + "s");
+    if (/(?:sh|ch|s|x|z)$/.test(word)) variants.push(word + "es");
+    if (word.endsWith("es")) variants.push(word.slice(0, -2));
+    return variants.some((v) => new RegExp(`\\b${esc(v)}\\b`, "i").test(text));
+  }
+
   const preFiltered = qWords.length > 0
     ? allEntries.filter((e) => {
         const name = (e.productName || "").toLowerCase();
         if (!name) return true; // keep items with no name (can't filter)
-        return qWords.every((w) => name.includes(w));
+        return qWords.every((w) => fuzzyIncludes(name, w));
       })
     : allEntries;
 
