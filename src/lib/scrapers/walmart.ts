@@ -82,9 +82,15 @@ async function scrapeWalmartCA(query: string): Promise<ScrapedPrice[]> {
           [];
 
         for (const item of searchResult) {
+          // Walmart.ca __NEXT_DATA__ may expose price as a direct number,
+          // an object { value }, or nested inside priceInfo.
+          const rawPrice = item.price;
           const price =
-            item.price?.value ??
+            (typeof rawPrice === "number" ? rawPrice : rawPrice?.value) ??
             item.priceInfo?.currentPrice?.price ??
+            (item.priceInfo?.linePrice
+              ? parseFloat(item.priceInfo.linePrice.replace(/[^0-9.]/g, ""))
+              : null) ??
             null;
           if (!price || price <= 0) continue;
 
@@ -156,7 +162,9 @@ async function scrapeWalmartUS(query: string): Promise<ScrapedPrice[]> {
           nextData?.props?.pageProps?.initialData?.searchResult?.itemStacks?.[0]?.items || [];
 
         for (const item of items as WalmartSearchItem[]) {
+          const rawPrice = (item as any).price;
           const price =
+            (typeof rawPrice === "number" ? rawPrice : undefined) ??
             item.priceInfo?.currentPrice?.price ??
             item.priceInfo?.linePrice?.price ??
             null;

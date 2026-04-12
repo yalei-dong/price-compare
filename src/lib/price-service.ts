@@ -833,6 +833,10 @@ function filterMisleadingResults(results: PriceEntry[], query: string): PriceEnt
   return results.filter((r) => {
     const name = (r.productName || "").toLowerCase();
     if (!name) return true; // keep items with no name info
+    // Strip web page title suffixes (breadcrumbs, site names) for compound checks
+    // e.g. "Blueberries - Shop for Berries & Cherries | Real Canadian Superstore"
+    //    → "Blueberries"
+    const cleanName = name.replace(/\s*[|\u2013\u2014].*$/, "").replace(/\s+-\s+(shop|buy|order|browse|products?)\b.*$/i, "").trim() || name;
 
     // Product name must contain every query word (with plural/singular tolerance)
     if (!queryWords.every((w) => wordMatchesText(w, name))) {
@@ -847,7 +851,7 @@ function filterMisleadingResults(results: PriceEntry[], query: string): PriceEnt
       }
     }
 
-    const nameWords = name.split(/[\s,/&+]+/).filter(Boolean);
+    const nameWords = cleanName.split(/[\s,/&+]+/).filter(Boolean);
 
     // When a query word is a known food, reject products where the query food
     // is just a modifier/ingredient for a DIFFERENT main product.
@@ -946,22 +950,19 @@ export async function fetchGoogleShoppingPrices(
     results = await fetchScrapedPrices(query, countryCode);
   }
 
-  // If scrapers returned thin results, supplement with free/paid APIs
-  if (results.length < MIN_SCRAPE_RESULTS) {
-    // Try free providers first (Bing / Brave — no cost)
-    if (hasAnyFreeProvider()) {
-      const freeResults = await fetchPricesFromFreeProviders(query, countryCode);
-      results = mergeAndDedup([...results, ...freeResults]);
-    }
+  // Always supplement with free providers (Bing / Brave — no cost)
+  if (hasAnyFreeProvider()) {
+    const freeResults = await fetchPricesFromFreeProviders(query, countryCode);
+    results = mergeAndDedup([...results, ...freeResults]);
+  }
 
-    // Still thin? Fall back to SerpAPI (paid, last resort)
-    if (results.length < MIN_SCRAPE_RESULTS) {
-      const apiKey = process.env.SERPAPI_KEY;
-      if (apiKey && serpBudgetRemaining()) {
-        serpBudgetIncrement();
-        const serpResults = await fetchFromSerpAPI(query, countryCode, serpLocation, apiKey);
-        results = mergeAndDedup([...results, ...serpResults]);
-      }
+  // Still thin? Fall back to SerpAPI (paid, last resort)
+  if (results.length < MIN_SCRAPE_RESULTS) {
+    const apiKey = process.env.SERPAPI_KEY;
+    if (apiKey && serpBudgetRemaining()) {
+      serpBudgetIncrement();
+      const serpResults = await fetchFromSerpAPI(query, countryCode, serpLocation, apiKey);
+      results = mergeAndDedup([...results, ...serpResults]);
     }
   }
 
